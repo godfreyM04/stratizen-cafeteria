@@ -1,0 +1,111 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap');
+
+:root {
+  /* Colors */
+  --color-surface-dim: #dcd9d9;
+  --color-surface: #fcf9f8;
+  --color-on-surface: #1c1b1b;
+  --color-outline-variant: #c3c6d1;
+  --color-on-surface-variant: #43474f;
+  --color-primary-fixed: #d5e3ff;
+  --color-inverse-on-surface: #f3f0ef;
+  --color-primary-fixed-dim: #a7c8ff;
+  --color-surface-container-high: #eae7e7;
+  --color-on-tertiary-fixed: #001e2d;
+  --color-on-secondary-fixed: #002204;
+  --color-on-secondary-fixed-variant: #005312;
+  --color-on-tertiary: #ffffff;
+  --color-inverse-primary: #a7c8ff;
+  --color-tertiary: #002131;
+  --color-surface-container-highest: #e5e2e1;
+  --color-surface-tint: #3a5f94;
+  --color-on-secondary-container: #217128;
+  --color-on-primary-fixed-variant: #1f477b;
+  --color-on-primary: #ffffff;
+  --color-tertiary-fixed-dim: #87cffc;
+  --color-surface-container-lowest: #ffffff;
+  --color-on-error-container: #93000a;
+  --color-secondary: #1b6d24;
+  --color-primary: #003366; /* University Blue */
+  --color-on-primary-fixed: #001b3c;
+  --color-on-tertiary-container: #5aa3ce;
+  --color-secondary-container: #a0f399;
+  --color-primary-container: #d5e3ff;
+  --color-error: #ba1a1a;
+  --color-tertiary-container: #00374f;
+  --color-surface-container: #f0eded;
+  --color-on-secondary: #ffffff;
+  --color-surface-bright: #fcf9f8;
+  --color-secondary-fixed-dim: #88d982;
+  --color-on-tertiary-fixed-variant: #004c6b;
+  --color-error-container: #ffdad6;
+  --color-outline: #737780;
+  --color-surface-container-low: #f6f3f2;
+  --color-secondary-fixed: #a3f69c;
+  --color-on-background: #1c1b1b;
+  --color-tertiary-fixed: #c6e7ff;
+  --color-surface-variant: #e5e2e1;
+  --color-on-primary-container: #799dd6;
+  --color-on-error: #ffffff;
+  --color-inverse-surface: #313030;
+  --color-background: #fcf9f8;
+
+  /* Border Radius */
+  --border-radius-default: 0.25rem;
+  --border-radius-lg: 0.5rem;
+  --border-radius-xl: 0.75rem;
+  --border-radius-full: 9999px;
+
+  /* Spacing */
+  --spacing-margin-desktop: 64px;
+  --spacing-xl: 32px;
+  --spacing-base: 4px;
+  --spacing-sm: 8px;
+  --spacing-lg: 24px;
+  --spacing-gutter: 16px;
+  --spacing-md: 16px;
+  --spacing-xs: 4px;
+  --spacing-margin-mobile: 16px;
+
+  /* Fonts */
+  --font-family: 'Inter', sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: var(--font-family);
+  background-color: var(--color-background);
+  color: var(--color-on-background);
+  min-height: 100vh;
+}
+
+a {
+  text-decoration: none;
+}
+
+button {
+  cursor: pointer;
+  font-family: var(--font-family);
+}
+
+input {
+  font-family: var(--font-family);
+  outline: none;
+}
+
+/* Material symbols adjustments */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.fill-icon {
+  font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}

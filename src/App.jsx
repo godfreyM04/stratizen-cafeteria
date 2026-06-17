@@ -1,0 +1,94 @@
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+
+import { AuthProvider } from "./context/AuthContext";
+import { TrayProvider } from "./context/TrayContext";
+import { ToastProvider } from "./context/ToastContext";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Dashboard from "./pages/Dashboard";
+import Menu from "./pages/Menu";
+import FoodDetails from "./pages/FoodDetails";
+import Orders from "./pages/Orders";
+import ProtectedRoute from "./components/ProtectedRoute";
+import PublicRoute from "./components/PublicRoute";
+import "./styles/Toast.css";
+import "./styles/QuantityCounter.css";
+
+function App() {
+  return (
+    <AuthProvider>
+      <TrayProvider>
+        <ToastProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Public routes (guests only) */}
+              <Route
+                path="/login"
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/register"
+                element={
+                  <PublicRoute>
+                    <Register />
+                  </PublicRoute>
+                }
+              />
+              {/* Handle /signup redirect alias */}
+              <Route
+                path="/signup"
+                element={<Navigate to="/register" replace />}
+              />
+
+              {/* Protected routes (authenticated users only) */}
+              <Route
+                path="/menu"
+                element={
+                  <ProtectedRoute>
+                    <Menu />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/food/:id"
+                element={
+                  <ProtectedRoute>
+                    <FoodDetails />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/orders"
+                element={
+                  <ProtectedRoute>
+                    <Orders />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/dashboard"
+                element={
+                  <ProtectedRoute>
+                    <Dashboard />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Root redirect */}
+              <Route
+                path="/"
+                element={<Navigate to="/menu" replace />}
+              />
+            </Routes>
+          </BrowserRouter>
+        </ToastProvider>
+      </TrayProvider>
+    </AuthProvider>
+  );
+}
+
+export default App;
