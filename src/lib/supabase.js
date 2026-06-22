@@ -16,3 +16,19 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
+// Extract project reference from URL to resolve local storage key dynamically
+export const getProjectRef = () => {
+  try {
+    const hostname = new URL(supabaseUrl).hostname;
+    return hostname.split(".")[0];
+  } catch (err) {
+    return "";
+  }
+};
+
+export const getAuthTokenKey = () => {
+  const ref = getProjectRef();
+  return ref ? `sb-${ref}-auth-token` : "";
+};
+
+

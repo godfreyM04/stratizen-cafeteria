@@ -1,13 +1,55 @@
-import React from "react";
+import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTray } from "../context/TrayContext";
 import { useToast } from "../context/ToastContext";
+import { mockMenuItems } from "../data/mockMenu";
 import AuthLayout from "../components/AuthLayout";
 import QuantityCounter from "../components/QuantityCounter";
 import "../styles/Orders.css";
 
 const formatKES = (price) => {
   return price.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+
+const getCategoryIcon = (category) => {
+  switch (category?.toLowerCase()) {
+    case "drinks": return "coffee";
+    case "breakfast": return "free_breakfast";
+    case "lunch": return "restaurant";
+    case "dinner": return "dinner_dining";
+    case "snacks": return "cookie";
+    default: return "restaurant";
+  }
+};
+
+const formatRecentOrderTime = (isoString) => {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return isoString;
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+  const txDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  let hours = date.getHours();
+  const minutes = date.getMinutes().toString().padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  const timeStr = `${hours}:${minutes} ${ampm}`;
+
+  if (txDay.getTime() === today.getTime()) {
+    return `Today, ${timeStr}`;
+  } else if (txDay.getTime() === yesterday.getTime()) {
+    return `Yesterday, ${timeStr}`;
+  } else {
+    const day = date.getDate();
+    const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = months[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}, ${timeStr}`;
+  }
 };
 
 function Orders() {
@@ -17,39 +59,55 @@ function Orders() {
     subtotal,
     tax,
     total,
-    updateQuantity,
-    removeFromTray,
-    clearTray,
     addToTray,
   } = useTray();
 
   const { addToast } = useToast();
-
   const navigate = useNavigate();
 
-  // Mock recent orders that are interactive
-  const recentOrders = [
-    {
-      id: "iced-caramel-latte",
-      name: "Iced Caramel Latte",
-      price: 450.00,
-      time: "Yesterday, 9:15 AM",
-      icon: "coffee",
-      image: "https://images.unsplash.com/photo-1517701604599-bb29b565090c?w=400&q=80",
-      category: "Drinks",
-      description: "Rich espresso combined with milk and sweet caramel syrup over ice.",
-    },
-    {
-      id: "veggie-wrap",
-      name: "Veggie Wrap",
-      price: 600.00,
-      time: "Oct 24, 12:30 PM",
-      icon: "tapas",
-      image: "https://images.unsplash.com/photo-1626700051175-6518c4793f4f?w=400&q=80",
-      category: "Lunch",
-      description: "Tortilla wrap filled with mixed greens, red pepper, cucumber, and hummus.",
-    },
-  ];
+  const [walletBalance] = useState(() => {
+    const cached = localStorage.getItem("stratizen_wallet_balance");
+    return cached ? parseFloat(cached) : 42.50;
+  });
+
+  const [recentOrders] = useState(() => {
+    const historyJson = localStorage.getItem("stratizen_order_history");
+    if (historyJson) {
+      try {
+        const history = JSON.parse(historyJson);
+        const itemMap = new Map();
+
+        // Populate the items while preserving the most recent order date
+        history.forEach((order) => {
+          if (order.items && Array.isArray(order.items)) {
+            order.items.forEach((orderItem) => {
+              // Ensure item still exists in Menu database
+              const menuMatch = mockMenuItems.find(m => m.id === orderItem.id);
+              if (menuMatch) {
+                const existing = itemMap.get(orderItem.id);
+                if (!existing || new Date(order.placedAt) > new Date(existing.placedAt)) {
+                  itemMap.set(orderItem.id, {
+                    ...menuMatch,
+                    placedAt: order.placedAt,
+                    time: formatRecentOrderTime(order.placedAt),
+                    icon: getCategoryIcon(menuMatch.category)
+                  });
+                }
+              }
+            });
+          }
+        });
+
+        // Convert Map to array sorted by placedAt date descending
+        return Array.from(itemMap.values()).sort(
+          (a, b) => new Date(b.placedAt) - new Date(a.placedAt)
+        );
+      } catch (e) {
+        console.error("Failed to parse order history:", e);
+      }
+    }
+    return [];
+  });
 
   const handleReorder = (item) => {
     addToTray(
@@ -67,9 +125,7 @@ function Orders() {
   };
 
   const handleCheckout = () => {
-    alert(`Proceeding to payment of KES ${formatKES(total)} with your Campus Wallet.\nOrder successfully submitted!`);
-    clearTray();
-    navigate("/menu");
+    navigate("/checkout");
   };
 
   return (
@@ -134,27 +190,37 @@ function Orders() {
                 View All
               </a>
             </div>
-            <div className="recents-horizontal-scroll">
-              {recentOrders.map((order) => (
-                <div key={order.id} className="recents-card">
-                  <div className="recents-icon-box">
-                    <span className="material-symbols-outlined">{order.icon}</span>
+            {recentOrders.length > 0 ? (
+              <div className="recents-horizontal-scroll">
+                {recentOrders.map((order) => (
+                  <div key={order.id} className="recents-card">
+                    <div className="recents-icon-box">
+                      <span className="material-symbols-outlined">{order.icon}</span>
+                    </div>
+                    <div className="recents-info">
+                      <h4 className="recents-name">{order.name}</h4>
+                      <p className="recents-time">{order.time}</p>
+                      <p className="recents-price">KES {formatKES(order.price)}</p>
+                    </div>
+                    <button
+                      className="recents-reorder-btn"
+                      onClick={() => handleReorder(order)}
+                      title="Reorder"
+                    >
+                      <span className="material-symbols-outlined">replay</span>
+                    </button>
                   </div>
-                  <div className="recents-info">
-                    <h4 className="recents-name">{order.name}</h4>
-                    <p className="recents-time">{order.time}</p>
-                    <p className="recents-price">KES {formatKES(order.price)}</p>
-                  </div>
-                  <button
-                    className="recents-reorder-btn"
-                    onClick={() => handleReorder(order)}
-                    title="Reorder"
-                  >
-                    <span className="material-symbols-outlined">replay</span>
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-recents-container">
+                <span className="material-symbols-outlined" style={{ fontSize: "40px", color: "var(--color-outline)", marginBottom: "8px" }}>
+                  history
+                </span>
+                <p style={{ fontSize: "14px", fontWeight: "600", color: "var(--color-on-surface)", marginBottom: "4px" }}>No recent orders yet</p>
+                <p style={{ fontSize: "12px", color: "var(--color-on-surface-variant)" }}>Your ordered items will appear here for quick reordering.</p>
+              </div>
+            )}
           </div>
         </section>
 
@@ -164,46 +230,19 @@ function Orders() {
           <div className="wallet-glance-card">
             <div className="wallet-content">
               <div className="wallet-header">
-                <h3 className="wallet-title">Campus Wallet</h3>
+                <h3 className="wallet-glance-title">Campus Wallet</h3>
                 <span className="material-symbols-outlined">account_balance_wallet</span>
               </div>
-              <div className="wallet-balance">KES 4,250.00</div>
+              <div className="wallet-balance">KES {formatKES(walletBalance)}</div>
               <p className="wallet-balance-label">Available Balance</p>
               <button
                 className="wallet-topup-btn"
-                onClick={() => alert("Wallet recharge portal coming soon!")}
+                onClick={() => navigate("/wallet")}
               >
                 Top Up Balance
               </button>
             </div>
             <div className="wallet-pattern"></div>
-          </div>
-
-          {/* Announcements Card */}
-          <div className="announcements-card">
-            <h3 className="announcements-title">
-              <span className="material-symbols-outlined">campaign</span> Announcements
-            </h3>
-            <ul className="announcements-list">
-              <li className="announcement-item">
-                <div className="announcement-dot red"></div>
-                <div>
-                  <h4 className="announcement-header">Lunch Special at Counter B</h4>
-                  <p className="announcement-text">
-                    Get 10% off all hot bowls between 12 PM and 2 PM today.
-                  </p>
-                </div>
-              </li>
-              <li className="announcement-item">
-                <div className="announcement-dot blue"></div>
-                <div>
-                  <h4 className="announcement-header">New Coffee Station Open</h4>
-                  <p className="announcement-text">
-                    The North Wing now has a self-serve espresso bar.
-                  </p>
-                </div>
-              </li>
-            </ul>
           </div>
 
           {/* Order Summary */}
@@ -257,10 +296,10 @@ function Orders() {
           </div>
           <span className="mobile-nav-label">Tray</span>
         </Link>
-        <a href="#" onClick={(e) => { e.preventDefault(); alert("Wallet Balance Glance: KES 4,250.00"); }} className="mobile-nav-item">
+        <Link to="/wallet" className="mobile-nav-item">
           <span className="material-symbols-outlined">account_balance_wallet</span>
           <span className="mobile-nav-label">Wallet</span>
-        </a>
+        </Link>
         <a href="#" onClick={(e) => { e.preventDefault(); alert("Profile info"); }} className="mobile-nav-item">
           <span className="material-symbols-outlined">person</span>
           <span className="mobile-nav-label">Profile</span>

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from "react";
 
 const TrayContext = createContext(null);
 
@@ -19,7 +19,7 @@ export const TrayProvider = ({ children }) => {
   }, [trayItems]);
 
   // Add item to tray
-  const addToTray = (item, quantity = 1) => {
+  const addToTray = useCallback((item, quantity = 1) => {
     setTrayItems((prevItems) => {
       const existingItemIndex = prevItems.findIndex((i) => i.id === item.id);
       if (existingItemIndex > -1) {
@@ -46,12 +46,12 @@ export const TrayProvider = ({ children }) => {
         ];
       }
     });
-  };
+  }, []);
 
   // Update item quantity
-  const updateQuantity = (itemId, quantity) => {
+  const updateQuantity = useCallback((itemId, quantity) => {
     if (quantity <= 0) {
-      removeFromTray(itemId);
+      setTrayItems((prevItems) => prevItems.filter((item) => item.id !== itemId));
       return;
     }
     setTrayItems((prevItems) =>
@@ -59,25 +59,25 @@ export const TrayProvider = ({ children }) => {
         item.id === itemId ? { ...item, quantity } : item
       )
     );
-  };
+  }, []);
 
   // Remove item from tray
-  const removeFromTray = (itemId) => {
+  const removeFromTray = useCallback((itemId) => {
     setTrayItems((prevItems) => prevItems.filter((item) => item.id !== itemId));
-  };
+  }, []);
 
   // Clear all items in tray
-  const clearTray = () => {
+  const clearTray = useCallback(() => {
     setTrayItems([]);
-  };
+  }, []);
 
   // Computed state properties
-  const itemCount = trayItems.reduce((total, item) => total + item.quantity, 0);
-  const subtotal = trayItems.reduce((total, item) => total + item.price * item.quantity, 0);
-  const tax = subtotal * 0.08; // 8% Tax
-  const total = subtotal + tax;
+  const itemCount = useMemo(() => trayItems.reduce((total, item) => total + item.quantity, 0), [trayItems]);
+  const subtotal = useMemo(() => trayItems.reduce((total, item) => total + item.price * item.quantity, 0), [trayItems]);
+  const tax = useMemo(() => subtotal * 0.08, [subtotal]); // 8% Tax
+  const total = useMemo(() => subtotal + tax, [subtotal, tax]);
 
-  const value = {
+  const value = useMemo(() => ({
     trayItems,
     itemCount,
     subtotal,
@@ -87,7 +87,17 @@ export const TrayProvider = ({ children }) => {
     updateQuantity,
     removeFromTray,
     clearTray,
-  };
+  }), [
+    trayItems,
+    itemCount,
+    subtotal,
+    tax,
+    total,
+    addToTray,
+    updateQuantity,
+    removeFromTray,
+    clearTray
+  ]);
 
   return <TrayContext.Provider value={value}>{children}</TrayContext.Provider>;
 };

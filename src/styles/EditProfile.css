@@ -1,0 +1,233 @@
+/* Edit Profile CSS styles matching Stitch mockup */
+
+.edit-profile-wrapper {
+  max-w-xl: 576px;
+  max-width: 576px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.edit-profile-container {
+  background-color: var(--color-surface-container-lowest);
+  border-radius: var(--border-radius-xl);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05), 0 1px 2px rgba(0, 0, 0, 0.1);
+  border: 1px solid rgba(195, 198, 209, 0.3);
+  overflow: hidden;
+  animation: slideUp 0.5s ease-out;
+}
+
+.edit-profile-content {
+  padding: var(--spacing-xl);
+}
+
+@media (min-width: 768px) {
+  .edit-profile-content {
+    padding: 32px;
+  }
+}
+
+.edit-profile-header {
+  margin-bottom: var(--spacing-xl);
+  text-align: center;
+}
+
+@media (min-width: 768px) {
+  .edit-profile-header {
+    text-align: left;
+  }
+}
+
+.edit-profile-title {
+  font-size: 32px; /* headline-lg */
+  font-weight: 600;
+  color: var(--color-primary);
+  margin-bottom: var(--spacing-xs);
+  margin-top: 0;
+}
+
+.edit-profile-subtitle {
+  font-size: 14px; /* body-md */
+  color: var(--color-on-surface-variant);
+  margin: 0;
+}
+
+.edit-profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.form-field-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.form-field-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.form-field-label {
+  font-size: 14px; /* label-lg */
+  font-weight: 500;
+  color: var(--color-on-surface);
+  display: block;
+}
+
+.read-only-badge {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--color-outline);
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.read-only-badge .material-symbols-outlined {
+  font-size: 12px !important;
+}
+
+.input-relative-wrapper {
+  position: relative;
+  width: 100%;
+}
+
+.input-icon {
+  position: absolute;
+  left: var(--spacing-md);
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-outline);
+  pointer-events: none;
+  transition: color 0.2s ease;
+}
+
+.input-icon.disabled-icon {
+  opacity: 0.5;
+}
+
+.input-relative-wrapper:focus-within .input-icon:not(.disabled-icon) {
+  color: var(--color-primary);
+}
+
+.form-field-input {
+  width: 100%;
+  padding: var(--spacing-md);
+  padding-left: var(--spacing-xl);
+  border-radius: var(--border-radius-lg);
+  border: 1px solid var(--color-outline-variant);
+  font-size: 16px; /* body-lg */
+  background-color: var(--color-surface-bright);
+  transition: all 0.2s ease;
+  color: var(--color-on-surface);
+}
+
+.form-field-input:focus {
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-fixed-dim);
+}
+
+.form-field-input:disabled {
+  background-color: var(--color-surface-container);
+  border-color: var(--color-outline-variant);
+  color: var(--color-outline);
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.input-helper-text {
+  font-size: 11px;
+  color: var(--color-on-surface-variant);
+  font-style: italic;
+  margin: 0;
+}
+
+.form-actions-wrapper {
+  margin-top: var(--spacing-xl);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+@media (min-width: 640px) {
+  .form-actions-wrapper {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}
+
+.btn-cancel {
+  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: var(--border-radius-full);
+  font-size: 14px; /* label-lg */
+  font-weight: 500;
+  color: var(--color-primary);
+  background: none;
+  border: 1px solid var(--color-outline-variant);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-cancel:hover {
+  background-color: var(--color-surface-container-high);
+}
+
+.btn-cancel:active {
+  transform: scale(0.95);
+}
+
+.btn-save {
+  padding: var(--spacing-md) var(--spacing-xl);
+  border-radius: var(--border-radius-full);
+  font-size: 14px; /* label-lg */
+  font-weight: 500;
+  color: var(--color-on-primary);
+  background-color: var(--color-primary);
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.btn-save:hover:not(:disabled) {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  opacity: 0.95;
+}
+
+.btn-save:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.btn-save:disabled {
+  background-color: var(--color-outline-variant);
+  color: var(--color-outline);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btn-save .animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

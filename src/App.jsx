@@ -9,6 +9,10 @@ import Dashboard from "./pages/Dashboard";
 import Menu from "./pages/Menu";
 import FoodDetails from "./pages/FoodDetails";
 import Orders from "./pages/Orders";
+import Wallet from "./pages/Wallet";
+import Checkout from "./pages/Checkout";
+import OrderTracking from "./pages/OrderTracking";
+import EditProfile from "./pages/EditProfile";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PublicRoute from "./components/PublicRoute";
 import "./styles/Toast.css";
@@ -70,6 +74,23 @@ function App() {
                 }
               />
               <Route
+                path="/wallet"
+                element={
+                  <ProtectedRoute>
+                    <Wallet />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/checkout"
+                element={
+                  <ProtectedRoute>
+                    <Checkout />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
                 path="/dashboard"
                 element={
                   <ProtectedRoute>
@@ -77,6 +98,25 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+
+              <Route
+                path="/profile/edit"
+                element={
+                  <ProtectedRoute>
+                    <EditProfile />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/order-tracking"
+                element={
+                  <ProtectedRoute>
+                    <OrderTracking />
+                  </ProtectedRoute>
+                }
+              />
+
 
               {/* Root redirect */}
               <Route

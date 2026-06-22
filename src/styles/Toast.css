@@ -67,3 +67,15 @@
     font-size: 13px;
   }
 }
+
+/* Error Toast Styling */
+.toast-item.error {
+  background-color: var(--color-error-container);
+  color: var(--color-on-error-container);
+  border: 1px solid rgba(186, 26, 26, 0.15);
+}
+
+.toast-item.error .toast-icon {
+  color: var(--color-error);
+}
+
