@@ -24,6 +24,23 @@
   color: var(--color-on-background, #1c1b1b);
 }
 
+html.dark .checkout-page-container {
+  --color-primary: #4f8eff;
+  --color-primary-container: #003e7e;
+  --color-on-primary-container: #d5e3ff;
+  --color-secondary: #3ad06c;
+  --color-secondary-container: #00531e;
+  --color-outline-variant: #394254;
+  --color-surface-container-lowest: #1a1d28;
+  --color-surface-container-low: #13151f;
+  --color-surface-container-highest: #2b3143;
+  --color-on-background: #f1f3f9;
+  --color-on-surface: #f1f3f9;
+  --color-on-surface-variant: #a9b2c3;
+  --color-surface: #161922;
+  --color-background: #0f111a;
+}
+
 /* Accessibility utility to visually hide elements but keep them for screen-readers */
 .sr-only {
   position: absolute;
@@ -114,7 +131,7 @@
   background-color: var(--color-surface-container-lowest, #ffffff);
   border-radius: 12px;
   padding: 24px;
-  border: 1px solid rgba(195, 198, 209, 0.3); /* border-outline-variant/30 */
+  border: 1px solid rgba(var(--color-outline-variant-raw), 0.3); /* border-outline-variant/30 */
   box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
 }
 
@@ -388,7 +405,7 @@
 
 /* Totals Area */
 .summary-totals-area {
-  border-top: 1px solid rgba(195, 198, 209, 0.3); /* outline-variant/30 */
+  border-top: 1px solid rgba(var(--color-outline-variant-raw), 0.3); /* outline-variant/30 */
   padding-top: 16px;
   margin-bottom: 24px;
 }
@@ -411,7 +428,7 @@
   color: var(--color-on-background, #1c1b1b);
   margin-top: 12px;
   padding-top: 12px;
-  border-top: 1px solid rgba(195, 198, 209, 0.1);
+  border-top: 1px solid rgba(var(--color-outline-variant-raw), 0.1);
 }
 
 .total-bold-price {
@@ -557,20 +574,20 @@
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
-  box-shadow: 0 2px 4px rgba(186, 26, 26, 0.2);
+  box-shadow: 0 2px 4px rgba(var(--color-error-raw), 0.2);
   transition: all 0.2s ease;
 }
 
 .insufficient-btn-confirm:hover {
   filter: brightness(1.1);
-  box-shadow: 0 4px 8px rgba(186, 26, 26, 0.3);
+  box-shadow: 0 4px 8px rgba(var(--color-error-raw), 0.3);
 }
 
 /* Success Celebration Overlay */
 .success-overlay-container {
   position: fixed;
   inset: 0;
-  background-color: rgba(252, 249, 248, 0.9); /* light overlay using surface color */
+  background-color: rgba(var(--color-surface-raw), 0.9); /* overlay using surface color */
   display: flex;
   align-items: center;
   justify-content: center;
@@ -579,9 +596,9 @@
 }
 
 .success-overlay-card {
-  background: rgba(255, 255, 255, 0.85);
+  background: rgba(var(--color-surface-raw), 0.85);
   backdrop-filter: blur(12px);
-  border: 1px solid rgba(195, 198, 209, 0.4);
+  border: 1px solid rgba(var(--color-outline-variant-raw), 0.4);
   border-radius: 24px;
   padding: 40px 32px;
   width: 90%;
@@ -704,8 +721,8 @@
 }
 
 @keyframes overlayFadeIn {
-  from { background-color: rgba(252, 249, 248, 0); }
-  to { background-color: rgba(252, 249, 248, 0.9); }
+  from { background-color: rgba(var(--color-surface-raw), 0); }
+  to { background-color: rgba(var(--color-surface-raw), 0.9); }
 }
 
 @keyframes checkPop {

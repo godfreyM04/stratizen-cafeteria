@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
 import { TrayProvider } from "./context/TrayContext";
 import { ToastProvider } from "./context/ToastContext";
+import { ThemeProvider } from "./context/ThemeContext";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Dashboard from "./pages/Dashboard";
@@ -20,9 +21,10 @@ import "./styles/QuantityCounter.css";
 
 function App() {
   return (
-    <AuthProvider>
-      <TrayProvider>
-        <ToastProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <TrayProvider>
+          <ToastProvider>
           <BrowserRouter>
             <Routes>
               {/* Public routes (guests only) */}
@@ -125,9 +127,10 @@ function App() {
               />
             </Routes>
           </BrowserRouter>
-        </ToastProvider>
-      </TrayProvider>
-    </AuthProvider>
+          </ToastProvider>
+        </TrayProvider>
+      </AuthProvider>
+    </ThemeProvider>
   );
 }
 

@@ -32,8 +32,11 @@ const CelebrationCanvas = () => {
         this.size = Math.random() * 8 + 6;
         this.speedX = Math.random() * 4 - 2;
         this.speedY = Math.random() * 4 + 4;
-        // Theme colors: deep navy, green, teal, orange, gold, pink
-        const colors = ["#003366", "#1b6d24", "#00668e", "#ff8c00", "#ffd54f", "#e91e63"];
+        // Theme colors: deep navy, green, teal, orange, gold, pink (dynamic for dark mode)
+        const isDark = document.documentElement.classList.contains("dark");
+        const colors = isDark 
+          ? ["#4f8eff", "#3ad06c", "#61c3f2", "#ff8c00", "#ffd54f", "#e91e63"]
+          : ["#003366", "#1b6d24", "#00668e", "#ff8c00", "#ffd54f", "#e91e63"];
         this.color = colors[Math.floor(Math.random() * colors.length)];
         this.rotation = Math.random() * 360;
         this.rotationSpeed = Math.random() * 4 - 2;
@@ -436,7 +439,7 @@ function Checkout() {
         {/* Right Column: Order Summary */}
         <div className="checkout-right-col">
           <div className="checkout-card-section checkout-summary-panel">
-            <h2 className="checkout-section-title" style={{ borderBottom: "1px solid rgba(195, 198, 209, 0.3)", paddingBottom: "8px", marginBottom: "16px" }}>
+            <h2 className="checkout-section-title" style={{ borderBottom: "1px solid var(--color-outline-variant)", paddingBottom: "8px", marginBottom: "16px" }}>
               <span className="material-symbols-outlined" style={{ marginRight: "8px" }}>shopping_cart</span>
               Order Summary
             </h2>

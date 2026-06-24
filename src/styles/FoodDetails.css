@@ -48,7 +48,7 @@
 .product-image-card {
   border-radius: var(--border-radius-xl);
   overflow: hidden;
-  box-shadow: 0 4px 12px -2px rgba(0, 30, 64, 0.08); /* shadow-tonal */
+  box-shadow: 0 4px 12px -2px rgba(var(--color-primary-raw), 0.08); /* shadow-tonal */
   background-color: var(--color-surface-container-lowest);
   position: relative;
   aspect-ratio: 4/3;
@@ -357,5 +357,5 @@
 }
 
 .related-card-add-btn:hover {
-  background-color: rgba(27, 109, 36, 0.9);
+  background-color: rgba(var(--color-secondary-raw), 0.9);
 }

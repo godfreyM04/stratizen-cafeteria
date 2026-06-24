@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { useTray } from "../context/TrayContext";
+import { useTheme } from "../context/ThemeContext";
 import "../styles/Menu.css";
 import "../styles/Orders.css";
 import "../styles/OrderTracking.css";
@@ -12,6 +13,7 @@ const FALLBACK_AVATAR = "https://lh3.googleusercontent.com/aida-public/AB6AXuDua
 const AuthLayout = ({ children, onSearchChange }) => {
   const { user, profile, logout } = useAuth();
   const { itemCount } = useTray();
+  const { theme, toggleTheme } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchValue, setSearchValue] = useState("");
@@ -145,11 +147,13 @@ const AuthLayout = ({ children, onSearchChange }) => {
           )}
 
           <button 
-            aria-label="dark_mode" 
+            aria-label={theme === "light" ? "Enable Dark Mode" : "Enable Light Mode"} 
             className="navbar-theme-toggle"
-            onClick={() => alert("Theme toggle coming soon!")}
+            onClick={toggleTheme}
           >
-            <span className="material-symbols-outlined">dark_mode</span>
+            <span key={theme} className="material-symbols-outlined theme-toggle-icon">
+              {theme === "light" ? "dark_mode" : "light_mode"}
+            </span>
           </button>
 
           <div 

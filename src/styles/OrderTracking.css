@@ -206,17 +206,17 @@
 .timeline-node.active-preparing {
   background-color: var(--color-secondary);
   color: var(--color-on-secondary);
-  box-shadow: 0 4px 8px rgba(27, 109, 36, 0.2);
+  box-shadow: 0 4px 8px rgba(var(--color-secondary-raw), 0.2);
   animation: node-pulse-green 2s infinite ease-in-out;
-  outline: 4px solid rgba(27, 109, 36, 0.15);
+  outline: 4px solid rgba(var(--color-secondary-raw), 0.15);
 }
 
 .timeline-node.active-other {
   background-color: var(--color-primary);
   color: var(--color-on-primary);
-  box-shadow: 0 4px 8px rgba(0, 51, 102, 0.2);
+  box-shadow: 0 4px 8px rgba(var(--color-primary-raw), 0.2);
   animation: node-pulse-blue 2s infinite ease-in-out;
-  outline: 4px solid rgba(0, 51, 102, 0.15);
+  outline: 4px solid rgba(var(--color-primary-raw), 0.15);
 }
 
 .timeline-node.pending {
@@ -232,30 +232,30 @@
 @keyframes node-pulse-green {
   0% {
     transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(27, 109, 36, 0.4);
+    box-shadow: 0 0 0 0 rgba(var(--color-secondary-raw), 0.4);
   }
   70% {
     transform: scale(1.05);
-    box-shadow: 0 0 0 10px rgba(27, 109, 36, 0);
+    box-shadow: 0 0 0 10px rgba(var(--color-secondary-raw), 0);
   }
   100% {
     transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(27, 109, 36, 0);
+    box-shadow: 0 0 0 0 rgba(var(--color-secondary-raw), 0);
   }
 }
 
 @keyframes node-pulse-blue {
   0% {
     transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(0, 51, 102, 0.4);
+    box-shadow: 0 0 0 0 rgba(var(--color-primary-raw), 0.4);
   }
   70% {
     transform: scale(1.05);
-    box-shadow: 0 0 0 10px rgba(0, 51, 102, 0);
+    box-shadow: 0 0 0 10px rgba(var(--color-primary-raw), 0);
   }
   100% {
     transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(0, 51, 102, 0);
+    box-shadow: 0 0 0 0 rgba(var(--color-primary-raw), 0);
   }
 }
 
@@ -319,7 +319,7 @@
   padding: var(--spacing-md);
   margin-top: -8px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.02);
-  border: 1px solid rgba(195, 198, 209, 0.3);
+  border: 1px solid rgba(var(--color-outline-variant-raw), 0.3);
   position: relative;
   overflow: hidden;
   animation: content-slide-in 0.3s ease-out;
@@ -327,12 +327,12 @@
 
 .active-content-box.preparing-border {
   border-left: 4px solid var(--color-secondary);
-  border-color: rgba(27, 109, 36, 0.3);
+  border-color: rgba(var(--color-secondary-raw), 0.3);
 }
 
 .active-content-box.other-border {
   border-left: 4px solid var(--color-primary);
-  border-color: rgba(0, 51, 102, 0.3);
+  border-color: rgba(var(--color-primary-raw), 0.3);
 }
 
 .status-indicator-badge {

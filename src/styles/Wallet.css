@@ -212,23 +212,23 @@
 
 /* Normal non-active bars */
 .chart-bar-inactive {
-  background: linear-gradient(to top, rgba(0, 51, 102, 0.2) 0%, rgba(0, 51, 102, 0.6) 100%);
+  background: linear-gradient(to top, rgba(var(--color-primary-raw), 0.2) 0%, rgba(var(--color-primary-raw), 0.6) 100%);
 }
 
 .chart-bar-inactive:hover {
-  background: linear-gradient(to top, rgba(0, 51, 102, 0.4) 0%, var(--color-primary, #003366) 100%);
+  background: linear-gradient(to top, rgba(var(--color-primary-raw), 0.4) 0%, var(--color-primary, #003366) 100%);
   transform: scaleY(1.05);
 }
 
 /* Active Highlight bar (Wednesday in Design) */
 .chart-bar-active {
   background: linear-gradient(to top, var(--color-primary, #003366) 0%, var(--color-tertiary, #00668e) 100%);
-  box-shadow: 0 4px 12px rgba(0, 51, 102, 0.2);
+  box-shadow: 0 4px 12px rgba(var(--color-primary-raw), 0.2);
 }
 
 .chart-bar-empty {
-  background-color: rgba(234, 231, 231, 0.5);
-  /* surface-container-high/50 */
+  background-color: var(--color-surface-container);
+  /* surface-container */
 }
 
 /* Tooltip on Hover */
@@ -349,12 +349,12 @@
 
 .transaction-row:hover {
   background-color: var(--color-surface-container-low, #f6f3f2);
-  border-color: rgba(195, 198, 209, 0.3);
+  border-color: rgba(var(--color-outline-variant-raw), 0.3);
   /* outline-variant/30 */
 }
 
 .transaction-row-deposit {
-  background-color: rgba(27, 109, 36, 0.05);
+  background-color: rgba(var(--color-secondary-raw), 0.05);
   /* secondary/5 */
 }
 

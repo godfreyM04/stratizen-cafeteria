@@ -51,6 +51,16 @@
   --color-inverse-surface: #313030;
   --color-background: #fcf9f8;
 
+  /* Custom RAW RGB variables for transparent overlay colors in Light Mode */
+  --color-surface-raw: 252, 249, 248;
+  --color-outline-variant-raw: 195, 198, 209;
+  --color-primary-raw: 0, 51, 102;
+  --color-secondary-raw: 27, 109, 36;
+  --color-error-raw: 186, 26, 26;
+  --color-surface-container-low-raw: 246, 243, 242;
+  
+  --color-overlay-bg: rgba(0, 30, 64, 0.2);
+
   /* Border Radius */
   --border-radius-default: 0.25rem;
   --border-radius-lg: 0.5rem;
@@ -108,4 +118,66 @@ input {
 
 .fill-icon {
   font-variation-settings: 'FILL' 1, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+}
+
+/* Dark mode colors */
+html.dark {
+  --color-background: #0f111a;
+  --color-on-background: #f1f3f9;
+  
+  --color-surface: #161922;
+  --color-on-surface: #f1f3f9;
+  --color-surface-dim: #0d0e14;
+  --color-surface-bright: #202431;
+  
+  --color-surface-container-lowest: #1a1d28;
+  --color-surface-container-low: #13151f;
+  --color-surface-container: #181c26;
+  --color-surface-container-high: #212634;
+  --color-surface-container-highest: #2b3143;
+  
+  --color-surface-variant: #2d3345;
+  --color-on-surface-variant: #a9b2c3;
+  --color-outline: #5f6a80;
+  --color-outline-variant: #394254;
+
+  --color-primary: #4f8eff;
+  --color-on-primary: #00224d;
+  --color-primary-container: #003e7e;
+  --color-on-primary-container: #d5e3ff;
+  --color-inverse-primary: #003366;
+  
+  --color-secondary: #3ad06c;
+  --color-on-secondary: #003912;
+  --color-secondary-container: #00531e;
+  --color-on-secondary-container: #a3f69c;
+  
+  --color-tertiary: #61c3f2;
+  --color-on-tertiary: #00354b;
+  --color-tertiary-container: #004d6a;
+  --color-on-tertiary-container: #cbe6ff;
+  
+  --color-error: #ffb4ab;
+  --color-on-error: #690005;
+  --color-error-container: #93000a;
+  --color-on-error-container: #ffdad6;
+
+  /* Custom RAW RGB variables for transparent overlay colors in Dark Mode */
+  --color-surface-raw: 22, 25, 34;
+  --color-outline-variant-raw: 57, 66, 84;
+  --color-primary-raw: 79, 142, 255;
+  --color-secondary-raw: 58, 208, 108;
+  --color-error-raw: 255, 180, 171;
+  --color-surface-container-low-raw: 19, 21, 31;
+  
+  --color-overlay-bg: rgba(0, 0, 0, 0.6);
+}
+
+/* Smooth transition utility only applied during theme toggle */
+body.theme-transitioning,
+body.theme-transitioning * {
+  transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
 }

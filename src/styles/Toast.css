@@ -24,7 +24,7 @@
   font-family: var(--font-family);
   font-size: 14px;
   font-weight: 600;
-  border: 1px solid rgba(27, 109, 36, 0.15); /* Soft border using primary green */
+  border: 1px solid rgba(var(--color-secondary-raw), 0.15); /* Soft border using primary green */
   
   /* Slide in animation */
   animation: toast-slide-in 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.15) forwards;
@@ -72,7 +72,7 @@
 .toast-item.error {
   background-color: var(--color-error-container);
   color: var(--color-on-error-container);
-  border: 1px solid rgba(186, 26, 26, 0.15);
+  border: 1px solid rgba(var(--color-error-raw), 0.15);
 }
 
 .toast-item.error .toast-icon {

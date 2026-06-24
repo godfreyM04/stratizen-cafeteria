@@ -204,7 +204,7 @@
 }
 
 .submit-button:hover:not(:disabled) {
-  background-color: rgba(0, 51, 102, 0.9);
+  background-color: rgba(var(--color-primary-raw), 0.9);
 }
 
 .submit-button:active:not(:disabled) {
