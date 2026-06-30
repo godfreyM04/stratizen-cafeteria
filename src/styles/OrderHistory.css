@@ -298,6 +298,11 @@ html.dark .order-history-container tr.hover\:bg-surface-container-low\/50\:hover
 }
 
 /* Responsiveness */
+@media (min-width: 768px) {
+  .order-history-container .md\:flex { display: flex; }
+  .order-history-container .md\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
+
 @media (max-width: 1023px) {
   .order-history-container aside.w-64 {
     width: 64px;
