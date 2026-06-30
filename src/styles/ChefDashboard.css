@@ -61,6 +61,7 @@
 .chef-dashboard-container .mb-xs { margin-bottom: var(--spacing-xs); }
 .chef-dashboard-container .mb-md { margin-bottom: var(--spacing-md); }
 .chef-dashboard-container .px-md { padding-left: var(--spacing-md); padding-right: var(--spacing-md); }
+.chef-dashboard-container .p-md { padding: var(--spacing-md); }
 .chef-dashboard-container .py-sm { padding-top: var(--spacing-sm); padding-bottom: var(--spacing-sm); }
 .chef-dashboard-container .p-sm { padding: var(--spacing-sm); }
 .chef-dashboard-container .p-lg { padding: var(--spacing-lg); }

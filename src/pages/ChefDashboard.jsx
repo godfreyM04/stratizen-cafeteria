@@ -1,13 +1,104 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import "../styles/ChefDashboard.css";
+
+// Helper to generate realistic initial orders if localStorage is empty
+const generateInitialOrders = () => {
+  const orders = [];
+  const now = new Date();
+  
+  // 1. Add 4 mock pending orders (matching the Stitch design exactly)
+  orders.push(
+    {
+      id: 2481,
+      name: "Sarah Jenkins",
+      items: "1x Grilled Salmon Bowl, 1x Iced Matcha",
+      time: "Placed 2m ago",
+      placedAt: new Date(now.getTime() - 2 * 60 * 1000).toISOString(),
+      status: "pending"
+    },
+    {
+      id: 2482,
+      name: "Marcus Thorne",
+      items: "2x Spicy Tofu Ramen (Extra Spice)",
+      time: "Placed 5m ago",
+      placedAt: new Date(now.getTime() - 5 * 60 * 1000).toISOString(),
+      status: "pending"
+    },
+    {
+      id: 2483,
+      name: "Elena Rodriguez",
+      items: "1x Chicken Caesar Salad, 1x Garlic Bread",
+      time: "Placed 8m ago",
+      placedAt: new Date(now.getTime() - 8 * 60 * 1000).toISOString(),
+      status: "pending"
+    },
+    {
+      id: 2484,
+      name: "Jordan Wu",
+      items: "3x Falafel Wraps, 3x Hummus Sides",
+      time: "Placed 12m ago",
+      placedAt: new Date(now.getTime() - 12 * 60 * 1000).toISOString(),
+      status: "pending"
+    }
+  );
+
+  // 2. Add 8 preparing orders
+  for (let i = 0; i < 8; i++) {
+    orders.push({
+      id: 2470 - i,
+      name: `Preparing Student ${i + 1}`,
+      items: "1x Meal",
+      placedAt: new Date(now.getTime() - (15 + i * 2) * 60 * 1000).toISOString(),
+      status: "preparing"
+    });
+  }
+
+  // 3. Add 5 ready orders
+  for (let i = 0; i < 5; i++) {
+    orders.push({
+      id: 2460 - i,
+      name: `Ready Student ${i + 1}`,
+      items: "1x Meal",
+      placedAt: new Date(now.getTime() - (25 + i * 3) * 60 * 1000).toISOString(),
+      status: "ready"
+    });
+  }
+
+  // 4. Add 142 completed orders distributed across peak hours today
+  const distributions = [
+    { startHour: 8, endHour: 10, count: 12 },
+    { startHour: 10, endHour: 12, count: 22 },
+    { startHour: 12, endHour: 14, count: 45 },
+    { startHour: 14, endHour: 16, count: 20 },
+    { startHour: 16, endHour: 18, count: 33 },
+    { startHour: 18, endHour: 20, count: 10 }
+  ];
+
+  let idCounter = 2300;
+  distributions.forEach(({ startHour, endHour, count }) => {
+    for (let i = 0; i < count; i++) {
+      const orderDate = new Date(now);
+      orderDate.setHours(startHour);
+      orderDate.setMinutes(Math.floor(Math.random() * 60));
+      orders.push({
+        id: idCounter++,
+        name: "Completed Student",
+        items: "1x Meal",
+        placedAt: orderDate.toISOString(),
+        status: "completed"
+      });
+    }
+  });
+
+  return orders;
+};
 
 function ChefDashboard() {
   const { logout } = useAuth();
   const navigate = useNavigate();
 
-  // Dashboard Stats State
   const [stats, setStats] = useState({
     pending: 12,
     preparing: 8,
@@ -15,47 +106,113 @@ function ChefDashboard() {
     completed: 142
   });
 
-  // Orders State
-  const [orders, setOrders] = useState([
-    {
-      id: 2481,
-      name: "Sarah Jenkins",
-      items: "1x Grilled Salmon Bowl, 1x Iced Matcha",
-      time: "Placed 2m ago"
-    },
-    {
-      id: 2482,
-      name: "Marcus Thorne",
-      items: "2x Spicy Tofu Ramen (Extra Spice)",
-      time: "Placed 5m ago"
-    },
-    {
-      id: 2483,
-      name: "Elena Rodriguez",
-      items: "1x Chicken Caesar Salad, 1x Garlic Bread",
-      time: "Placed 8m ago"
-    },
-    {
-      id: 2484,
-      name: "Jordan Wu",
-      items: "3x Falafel Wraps, 3x Hummus Sides",
-      time: "Placed 12m ago"
-    }
-  ]);
-
-  // Track processing state for each order button
+  const [orders, setOrders] = useState([]);
   const [processingOrders, setProcessingOrders] = useState({});
+
+  // Sync with localStorage
+  useEffect(() => {
+    const loadOrders = () => {
+      let allOrders = [];
+      const stored = localStorage.getItem("stratizen_chef_orders");
+      
+      if (stored) {
+        try {
+          allOrders = JSON.parse(stored);
+        } catch (e) {
+          console.error("Failed to parse chef orders:", e);
+        }
+      } else {
+        allOrders = generateInitialOrders();
+        localStorage.setItem("stratizen_chef_orders", JSON.stringify(allOrders));
+      }
+
+      // Check for active student orders in localStorage
+      const activeOrderStr = localStorage.getItem("stratizen_active_order");
+      if (activeOrderStr) {
+        try {
+          const activeOrder = JSON.parse(activeOrderStr);
+          const exists = allOrders.some(o => o.id === activeOrder.id || o.id.toString() === activeOrder.id.toString());
+          
+          if (!exists && activeOrder.status !== "collected") {
+            const formattedItems = activeOrder.items
+              ? activeOrder.items.map(i => `${i.quantity}x ${i.name}`).join(", ")
+              : "1x Custom Order";
+              
+            const newOrder = {
+              id: activeOrder.id,
+              name: activeOrder.items?.[0]?.name ? `${activeOrder.items[0].quantity}x ${activeOrder.items[0].name}` : "Student Order",
+              items: formattedItems,
+              time: "Placed just now",
+              placedAt: activeOrder.placedAt || new Date().toISOString(),
+              status: activeOrder.status || "pending"
+            };
+            
+            allOrders.unshift(newOrder);
+            localStorage.setItem("stratizen_chef_orders", JSON.stringify(allOrders));
+          }
+        } catch (e) {
+          console.error("Failed to parse active student order:", e);
+        }
+      }
+
+      // Update pending orders list for the queue
+      const pendingList = allOrders.filter(o => o.status === "pending" || o.status === "received");
+      setOrders(pendingList);
+
+      // Compute statistics dynamically
+      const pendingCount = allOrders.filter(o => o.status === "pending" || o.status === "received" || o.status === "confirmed").length;
+      const preparingCount = allOrders.filter(o => o.status === "preparing").length;
+      const readyCount = allOrders.filter(o => o.status === "ready").length;
+      const completedCount = allOrders.filter(o => o.status === "completed").length;
+
+      setStats({
+        pending: pendingCount,
+        preparing: preparingCount,
+        ready: readyCount,
+        completed: completedCount
+      });
+    };
+
+    loadOrders();
+    const interval = setInterval(loadOrders, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleStartPreparing = (orderId) => {
     setProcessingOrders(prev => ({ ...prev, [orderId]: true }));
 
     setTimeout(() => {
-      setOrders(prevOrders => prevOrders.filter(o => o.id !== orderId));
-      setStats(prevStats => ({
-        ...prevStats,
-        pending: Math.max(0, prevStats.pending - 1),
-        preparing: prevStats.preparing + 1
-      }));
+      const stored = localStorage.getItem("stratizen_chef_orders");
+      if (stored) {
+        try {
+          const allOrders = JSON.parse(stored);
+          const updated = allOrders.map(o => {
+            if (o.id === orderId || o.id.toString() === orderId.toString()) {
+              return { ...o, status: "preparing" };
+            }
+            return o;
+          });
+          localStorage.setItem("stratizen_chef_orders", JSON.stringify(updated));
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
+      // Update the active student order if it matches
+      const activeOrderStr = localStorage.getItem("stratizen_active_order");
+      if (activeOrderStr) {
+        try {
+          const activeOrder = JSON.parse(activeOrderStr);
+          if (activeOrder.id === orderId || activeOrder.id.toString() === orderId.toString()) {
+            activeOrder.status = "preparing";
+            activeOrder.simulatedStatus = "preparing";
+            localStorage.setItem("stratizen_active_order", JSON.stringify(activeOrder));
+          }
+        } catch (e) {
+          console.error(e);
+        }
+      }
+
       setProcessingOrders(prev => {
         const copy = { ...prev };
         delete copy[orderId];
@@ -72,6 +229,40 @@ function ChefDashboard() {
       console.error("Failed to log out:", err);
     }
   };
+
+  // Group completed orders by peak hours dynamically
+  const getGraphData = () => {
+    const counts = [0, 0, 0, 0, 0, 0]; // 8-10, 10-12, 12-14, 14-16, 16-18, 18-20
+    const stored = localStorage.getItem("stratizen_chef_orders");
+    if (!stored) return counts;
+    
+    try {
+      const allOrders = JSON.parse(stored);
+      const today = new Date().toDateString();
+      
+      allOrders.forEach(o => {
+        if (o.status !== "completed") return;
+        
+        const date = new Date(o.placedAt);
+        if (date.toDateString() !== today) return;
+        
+        const hour = date.getHours();
+        if (hour >= 8 && hour < 10) counts[0]++;
+        else if (hour >= 10 && hour < 12) counts[1]++;
+        else if (hour >= 12 && hour < 14) counts[2]++;
+        else if (hour >= 14 && hour < 16) counts[3]++;
+        else if (hour >= 16 && hour < 18) counts[4]++;
+        else if (hour >= 18 && hour < 20) counts[5]++;
+      });
+    } catch (e) {
+      console.error("Failed to compute graph data:", e);
+    }
+    
+    return counts;
+  };
+
+  const graphCounts = getGraphData();
+  const maxCount = Math.max(...graphCounts, 1);
 
   return (
     <div className="chef-dashboard-container text-on-background min-h-screen flex">
@@ -286,23 +477,23 @@ function ChefDashboard() {
                     <div className="border-t border-outline-variant w-full"></div>
                     <div className="border-t border-outline-variant w-full"></div>
                   </div>
-                  <div className="bg-primary/20 w-full rounded-t hover:bg-primary transition-colors cursor-help relative group" style={{height: "40%"}} title="8 AM - 10 AM">
-                    <div className="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] px-sm py-xs rounded whitespace-nowrap">24 Orders</div>
+                  <div className="bg-primary/20 w-full rounded-t hover:bg-primary transition-colors cursor-help relative group" style={{ height: `${(graphCounts[0] / maxCount) * 95}%` }} title="8 AM - 10 AM">
+                    <div className="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] px-sm py-xs rounded whitespace-nowrap">{graphCounts[0]} Orders</div>
                   </div>
-                  <div className="bg-primary/30 w-full rounded-t hover:bg-primary transition-colors cursor-help relative group" style={{height: "60%"}} title="10 AM - 12 PM">
-                    <div className="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] px-sm py-xs rounded whitespace-nowrap">42 Orders</div>
+                  <div className="bg-primary/30 w-full rounded-t hover:bg-primary transition-colors cursor-help relative group" style={{ height: `${(graphCounts[1] / maxCount) * 95}%` }} title="10 AM - 12 PM">
+                    <div className="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] px-sm py-xs rounded whitespace-nowrap">{graphCounts[1]} Orders</div>
                   </div>
-                  <div className="bg-primary w-full rounded-t hover:bg-primary-container transition-colors cursor-help relative group" style={{height: "95%"}} title="12 PM - 2 PM">
-                    <div className="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] px-sm py-xs rounded whitespace-nowrap">86 Orders</div>
+                  <div className="bg-primary w-full rounded-t hover:bg-primary-container transition-colors cursor-help relative group" style={{ height: `${(graphCounts[2] / maxCount) * 95}%` }} title="12 PM - 2 PM">
+                    <div className="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] px-sm py-xs rounded whitespace-nowrap">{graphCounts[2]} Orders</div>
                   </div>
-                  <div className="bg-primary/40 w-full rounded-t hover:bg-primary transition-colors cursor-help relative group" style={{height: "55%"}} title="2 PM - 4 PM">
-                    <div className="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] px-sm py-xs rounded whitespace-nowrap">38 Orders</div>
+                  <div className="bg-primary/40 w-full rounded-t hover:bg-primary transition-colors cursor-help relative group" style={{ height: `${(graphCounts[3] / maxCount) * 95}%` }} title="2 PM - 4 PM">
+                    <div className="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] px-sm py-xs rounded whitespace-nowrap">{graphCounts[3]} Orders</div>
                   </div>
-                  <div className="bg-primary/60 w-full rounded-t hover:bg-primary transition-colors cursor-help relative group" style={{height: "75%"}} title="4 PM - 6 PM">
-                    <div className="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] px-sm py-xs rounded whitespace-nowrap">62 Orders</div>
+                  <div className="bg-primary/60 w-full rounded-t hover:bg-primary transition-colors cursor-help relative group" style={{ height: `${(graphCounts[4] / maxCount) * 95}%` }} title="4 PM - 6 PM">
+                    <div className="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] px-sm py-xs rounded whitespace-nowrap">{graphCounts[4]} Orders</div>
                   </div>
-                  <div className="bg-primary/25 w-full rounded-t hover:bg-primary transition-colors cursor-help relative group" style={{height: "35%"}} title="6 PM - 8 PM">
-                    <div className="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] px-sm py-xs rounded whitespace-nowrap">18 Orders</div>
+                  <div className="bg-primary/25 w-full rounded-t hover:bg-primary transition-colors cursor-help relative group" style={{ height: `${(graphCounts[5] / maxCount) * 95}%` }} title="6 PM - 8 PM">
+                    <div className="hidden group-hover:block absolute -top-8 left-1/2 -translate-x-1/2 bg-inverse-surface text-inverse-on-surface text-[10px] px-sm py-xs rounded whitespace-nowrap">{graphCounts[5]} Orders</div>
                   </div>
                 </div>
                 
