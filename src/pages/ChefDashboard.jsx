@@ -440,7 +440,7 @@ function ChefDashboard() {
                           <p className="text-label-md text-on-surface-variant">{order.time}</p>
                         </div>
                         <button 
-                          className={`bg-primary text-on-primary px-lg py-sm rounded-lg font-label-lg hover:shadow-lg transition-all active:scale-95 flex items-center justify-center ${processingOrders[order.id] ? 'opacity-70 cursor-not-allowed' : ''}`}
+                          className={`bg-secondary text-on-secondary px-lg py-sm rounded-lg font-label-lg hover:shadow-lg transition-all active:scale-95 flex items-center justify-center ${processingOrders[order.id] ? 'opacity-70 cursor-not-allowed' : ''}`}
                           type="button"
                           onClick={() => handleStartPreparing(order.id)}
                           disabled={processingOrders[order.id]}

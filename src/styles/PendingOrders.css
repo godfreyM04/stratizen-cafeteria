@@ -120,6 +120,7 @@ html.dark .pending-orders-container .bg-surface\/80 {
 
 /* Text Colors */
 .pending-orders-container .text-primary { color: var(--color-primary); }
+.pending-orders-container .text-on-secondary { color: #ffffff; }
 .pending-orders-container .text-on-secondary-container { color: var(--color-on-secondary-container); }
 .pending-orders-container .text-on-surface { color: var(--color-on-surface); }
 .pending-orders-container .text-on-surface-variant { color: var(--color-on-surface-variant); }
