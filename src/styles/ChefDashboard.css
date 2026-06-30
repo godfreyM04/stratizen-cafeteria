@@ -1,0 +1,773 @@
+.chef-dashboard-container {
+  display: flex;
+  min-height: 100vh;
+  background-color: var(--color-background);
+  color: var(--color-on-background);
+  font-family: var(--font-family);
+}
+
+/* Sidebar Styling */
+.chef-sidebar {
+  height: 100vh;
+  width: 256px;
+  position: fixed;
+  left: 0;
+  top: 0;
+  background-color: var(--color-surface-container);
+  border-right: 1px solid var(--color-outline-variant);
+  display: flex;
+  flex-direction: column;
+  padding-top: var(--spacing-lg);
+  padding-bottom: var(--spacing-lg);
+  z-index: 50;
+}
+
+.chef-sidebar-brand {
+  padding-left: var(--spacing-lg);
+  padding-right: var(--spacing-lg);
+  margin-bottom: var(--spacing-xl);
+}
+
+.chef-brand-logo {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-xs);
+}
+
+.chef-brand-logo .material-symbols-outlined {
+  color: var(--color-primary);
+  font-size: 30px;
+}
+
+.chef-brand-logo h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--color-primary);
+  line-height: 1.2;
+}
+
+.chef-brand-subtitle {
+  font-size: 12px;
+  color: var(--color-on-surface-variant);
+  opacity: 0.7;
+}
+
+.chef-sidebar-nav {
+  flex: 1;
+  padding-left: var(--spacing-md);
+  padding-right: var(--spacing-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.chef-nav-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  color: var(--color-on-surface);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius-lg);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.chef-nav-item:hover {
+  background-color: var(--color-surface-container-high);
+}
+
+.chef-nav-item.active {
+  background-color: var(--color-secondary-container);
+  color: var(--color-on-secondary-container);
+}
+
+.chef-sidebar-footer {
+  padding-left: var(--spacing-md);
+  padding-right: var(--spacing-md);
+  margin-top: auto;
+  padding-top: var(--spacing-lg);
+  border-t: 1px solid rgba(195, 198, 209, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.chef-footer-btn {
+  width: 100%;
+  text-align: left;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  color: var(--color-on-surface);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: none;
+  border: none;
+  border-radius: var(--border-radius-lg);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.chef-footer-btn:hover {
+  background-color: var(--color-surface-container-high);
+}
+
+.chef-footer-btn.logout {
+  color: var(--color-error);
+}
+
+.chef-footer-btn.logout:hover {
+  background-color: rgba(186, 26, 26, 0.1);
+}
+
+/* Main Content Area */
+.chef-main-content {
+  margin-left: 256px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Header Styling */
+.chef-header {
+  width: 100%;
+  height: 64px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-left: var(--spacing-lg);
+  padding-right: var(--spacing-lg);
+  background-color: rgba(252, 249, 248, 0.8);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+  position: sticky;
+  top: 0;
+  z-index: 40;
+}
+
+.chef-header-search {
+  position: relative;
+}
+
+.chef-header-search .material-symbols-outlined {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--color-on-surface-variant);
+  pointer-events: none;
+}
+
+.chef-header-search input {
+  background-color: var(--color-surface-container);
+  border: none;
+  border-radius: var(--border-radius-full);
+  padding: var(--spacing-sm) var(--spacing-lg) var(--spacing-sm) 40px;
+  font-size: 14px;
+  width: 320px;
+  transition: all 0.2s ease;
+}
+
+.chef-header-search input:focus {
+  box-shadow: 0 0 0 2px var(--color-primary);
+}
+
+.chef-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.chef-action-btn {
+  background: none;
+  border: none;
+  padding: var(--spacing-sm);
+  color: var(--color-on-surface-variant);
+  border-radius: var(--border-radius-full);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.chef-action-btn:hover {
+  background-color: var(--color-surface-container);
+}
+
+.chef-action-btn.notification {
+  position: relative;
+}
+
+.notification-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 8px;
+  height: 8px;
+  background-color: var(--color-error);
+  border-radius: var(--border-radius-full);
+}
+
+.chef-header-divider {
+  height: 32px;
+  width: 1px;
+  background-color: var(--color-outline-variant);
+  margin-left: var(--spacing-sm);
+  margin-right: var(--spacing-sm);
+}
+
+.chef-profile-widget {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.chef-profile-info {
+  text-align: right;
+}
+
+.chef-profile-name {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-on-surface);
+  line-height: 1.2;
+}
+
+.chef-profile-role {
+  font-size: 10px;
+  color: var(--color-on-surface-variant);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.chef-profile-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--border-radius-full);
+  border: 2px solid var(--color-primary-fixed);
+  object-fit: cover;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Dashboard Content */
+.chef-dashboard-content {
+  padding: var(--spacing-lg);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  max-width: 1600px;
+  margin-left: auto;
+  margin-right: auto;
+  width: 100%;
+}
+
+/* Bento Grid */
+.chef-bento-grid {
+  display: grid;
+  grid-template-cols: 1fr;
+  gap: var(--spacing-lg);
+}
+
+@media (min-width: 768px) {
+  .chef-bento-grid {
+    grid-template-cols: repeat(2, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .chef-bento-grid {
+    grid-template-cols: repeat(4, 1fr);
+  }
+}
+
+.chef-bento-card {
+  background-color: var(--color-surface-container-lowest);
+  padding: var(--spacing-lg);
+  border-radius: var(--border-radius-xl);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: box-shadow 0.2s ease;
+  border-left: 4px solid transparent;
+}
+
+.chef-bento-card:hover {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.08);
+}
+
+.chef-bento-card.pending {
+  border-left-color: #F57C00;
+}
+
+.chef-bento-card.preparing {
+  border-left-color: var(--color-primary);
+}
+
+.chef-bento-card.ready {
+  border-left-color: var(--color-outline-variant);
+}
+
+.chef-bento-card.completed {
+  border-left-color: var(--color-secondary);
+}
+
+.chef-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+}
+
+.chef-card-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--color-on-surface-variant);
+  margin-bottom: var(--spacing-xs);
+}
+
+.chef-card-value {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.chef-bento-card.pending .chef-card-value {
+  color: #F57C00;
+}
+
+.chef-bento-card.preparing .chef-card-value {
+  color: var(--color-primary);
+}
+
+.chef-bento-card.ready .chef-card-value {
+  color: var(--color-on-surface-variant);
+}
+
+.chef-bento-card.completed .chef-card-value {
+  color: var(--color-secondary);
+}
+
+.card-icon {
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-lg);
+}
+
+.pending .card-icon {
+  color: #F57C00;
+  background-color: #FFF3E0;
+}
+
+.preparing .card-icon {
+  color: var(--color-primary);
+  background-color: var(--color-primary-fixed);
+}
+
+.ready .card-icon {
+  color: var(--color-on-surface-variant);
+  background-color: var(--color-surface-container-high);
+}
+
+.completed .card-icon {
+  color: var(--color-secondary);
+  background-color: var(--color-secondary-fixed);
+}
+
+.chef-card-trend {
+  font-size: 12px;
+  color: var(--color-on-surface-variant);
+  margin-top: var(--spacing-md);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+/* Operational Section */
+.chef-ops-section {
+  display: grid;
+  grid-template-cols: 1fr;
+  gap: var(--spacing-lg);
+}
+
+@media (min-width: 1024px) {
+  .chef-ops-section {
+    grid-template-cols: 2fr 1fr;
+  }
+}
+
+/* Incoming Orders */
+.chef-orders-queue {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.chef-section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-left: var(--spacing-xs);
+}
+
+.chef-section-header h3 {
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--color-on-surface);
+}
+
+.chef-text-link {
+  color: var(--color-primary);
+  font-size: 14px;
+  font-weight: 500;
+  background: none;
+  border: none;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  transition: text-decoration 0.2s ease;
+}
+
+.chef-text-link:hover {
+  text-decoration: underline;
+}
+
+.chef-orders-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.chef-order-row {
+  background-color: #ffffff;
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-xl);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  border: 1px solid rgba(195, 198, 209, 0.3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (min-width: 640px) {
+  .chef-order-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+.chef-order-row:hover {
+  border-color: rgba(0, 51, 102, 0.5);
+}
+
+.chef-order-details-col {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-lg);
+}
+
+.chef-ticket-badge {
+  background-color: var(--color-surface-container);
+  padding: var(--spacing-sm);
+  border-radius: var(--border-radius-lg);
+  text-align: center;
+  min-width: 70px;
+}
+
+.chef-ticket-title {
+  font-size: 10px;
+  color: var(--color-on-surface-variant);
+  text-transform: uppercase;
+  font-weight: 700;
+}
+
+.chef-ticket-num {
+  color: var(--color-primary);
+  font-weight: 700;
+  font-size: 18px;
+}
+
+.chef-order-info h4 {
+  font-size: 16px;
+  font-weight: 500;
+  color: var(--color-on-surface);
+  margin-bottom: 2px;
+}
+
+.chef-order-info p {
+  font-size: 14px;
+  color: var(--color-on-surface-variant);
+}
+
+.chef-order-actions-col {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
+}
+
+@media (max-width: 639px) {
+  .chef-order-actions-col {
+    border-top: 1px solid rgba(195, 198, 209, 0.2);
+    padding-top: var(--spacing-sm);
+  }
+}
+
+.chef-order-time {
+  font-size: 12px;
+  color: var(--color-on-surface-variant);
+  white-space: nowrap;
+}
+
+.chef-btn-prepare {
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  padding: var(--spacing-sm) var(--spacing-lg);
+  border: none;
+  border-radius: var(--border-radius-lg);
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+  white-space: nowrap;
+}
+
+.chef-btn-prepare:hover:not(:disabled) {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  opacity: 0.9;
+}
+
+.chef-btn-prepare:active:not(:disabled) {
+  transform: scale(0.95);
+}
+
+.chef-btn-prepare.processing {
+  background-color: var(--color-primary-container);
+  color: var(--color-on-primary-container);
+  cursor: not-allowed;
+}
+
+.chef-loading-span {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.chef-loading-span .material-symbols-outlined {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.chef-empty-queue {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xl);
+  background-color: var(--color-surface-container-lowest);
+  border-radius: var(--border-radius-xl);
+  border: 1px dashed var(--color-outline-variant);
+  color: var(--color-on-surface-variant);
+  gap: var(--spacing-sm);
+}
+
+.chef-empty-queue .material-symbols-outlined {
+  font-size: 48px;
+  color: var(--color-secondary);
+}
+
+/* Chart Container */
+.chef-chart-container {
+  display: flex;
+  flex-direction: column;
+}
+
+.chef-chart-card {
+  background-color: var(--color-surface-container-lowest);
+  padding: var(--spacing-lg);
+  border-radius: var(--border-radius-xl);
+  border: 1px solid rgba(195, 198, 209, 0.3);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chef-badge-today {
+  font-size: 12px;
+  color: var(--color-on-surface-variant);
+  background-color: var(--color-surface-container);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-default);
+}
+
+.chef-activity-chart {
+  flex: 1;
+  min-height: 200px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+  position: relative;
+}
+
+.chef-chart-grid-lines {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  pointer-events: none;
+  opacity: 0.2;
+}
+
+.chef-grid-line {
+  border-top: 1px solid var(--color-outline);
+  width: 100%;
+}
+
+.chef-chart-bars {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  z-index: 10;
+}
+
+.chef-chart-bar-col {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  position: relative;
+}
+
+.chef-chart-bar {
+  background-color: rgba(0, 51, 102, 0.2);
+  width: 70%;
+  border-radius: var(--border-radius-default) var(--border-radius-default) 0 0;
+  transition: all 0.2s ease;
+  cursor: help;
+  position: relative;
+}
+
+.chef-chart-bar:hover {
+  background-color: var(--color-primary);
+}
+
+.chef-chart-bar.active {
+  background-color: var(--color-primary);
+}
+
+.chef-chart-bar.active:hover {
+  background-color: var(--color-primary-container);
+}
+
+.chef-chart-tooltip {
+  display: none;
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(-8px);
+  background-color: var(--color-inverse-surface);
+  color: var(--color-inverse-on-surface);
+  font-size: 10px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--border-radius-default);
+  white-space: nowrap;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  z-index: 20;
+}
+
+.chef-chart-bar-col:hover .chef-chart-tooltip {
+  display: block;
+}
+
+.chef-chart-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 10px;
+  color: var(--color-on-surface-variant);
+  font-weight: 700;
+  text-transform: uppercase;
+  padding-left: var(--spacing-xs);
+  padding-right: var(--spacing-xs);
+}
+
+/* Footer Styling */
+.chef-footer {
+  margin-top: auto;
+  padding: var(--spacing-lg);
+  text-align: center;
+  border-top: 1px solid rgba(195, 198, 209, 0.3);
+}
+
+.chef-footer p {
+  font-size: 12px;
+  color: var(--color-on-surface-variant);
+}
+
+.status-operational {
+  color: var(--color-secondary);
+  font-weight: 700;
+}
+
+/* Responsive Overrides */
+@media (max-width: 1023px) {
+  .chef-sidebar {
+    width: 64px;
+    padding-left: 0;
+    padding-right: 0;
+    align-items: center;
+  }
+
+  .chef-sidebar-brand {
+    padding-left: 0;
+    padding-right: 0;
+    text-align: center;
+  }
+
+  .chef-brand-logo h1, .chef-brand-subtitle, .chef-nav-item span:not(.material-symbols-outlined), .chef-footer-btn span:not(.material-symbols-outlined) {
+    display: none;
+  }
+
+  .chef-sidebar-nav {
+    padding-left: var(--spacing-xs);
+    padding-right: var(--spacing-xs);
+    align-items: center;
+  }
+
+  .chef-nav-item {
+    padding: var(--spacing-sm);
+    justify-content: center;
+  }
+
+  .chef-sidebar-footer {
+    padding-left: var(--spacing-xs);
+    padding-right: var(--spacing-xs);
+    align-items: center;
+  }
+
+  .chef-footer-btn {
+    padding: var(--spacing-sm);
+    justify-content: center;
+  }
+
+  .chef-main-content {
+    margin-left: 64px;
+  }
+}

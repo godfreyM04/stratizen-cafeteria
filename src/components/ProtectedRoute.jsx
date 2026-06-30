@@ -2,8 +2,8 @@ import React from "react";
 import { Navigate, Outlet } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 
-const ProtectedRoute = ({ children }) => {
-  const { user, loading } = useAuth();
+const ProtectedRoute = ({ children, allowedRole = "student" }) => {
+  const { user, profile, loading } = useAuth();
 
   if (loading) {
     return (
@@ -41,6 +41,16 @@ const ProtectedRoute = ({ children }) => {
 
   if (!user) {
     return <Navigate to="/login" replace />;
+  }
+
+  const isChef = profile?.role === "chef" || user.email === "chef1@gmail.com";
+
+  if (allowedRole === "chef" && !isChef) {
+    return <Navigate to="/menu" replace />;
+  }
+
+  if (allowedRole === "student" && isChef) {
+    return <Navigate to="/chef/dashboard" replace />;
   }
 
   return children ? children : <Outlet />;

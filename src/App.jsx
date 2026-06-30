@@ -14,6 +14,7 @@ import Wallet from "./pages/Wallet";
 import Checkout from "./pages/Checkout";
 import OrderTracking from "./pages/OrderTracking";
 import EditProfile from "./pages/EditProfile";
+import ChefDashboard from "./pages/ChefDashboard";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PublicRoute from "./components/PublicRoute";
 import "./styles/Toast.css";
@@ -119,6 +120,14 @@ function App() {
                 }
               />
 
+              <Route
+                path="/chef/dashboard"
+                element={
+                  <ProtectedRoute allowedRole="chef">
+                    <ChefDashboard />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Root redirect */}
               <Route

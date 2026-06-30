@@ -36,6 +36,7 @@ const getCachedProfile = () => {
   }
 };
 
+
 const setCachedProfile = (profile) => {
   try {
     if (profile) {
@@ -48,8 +49,32 @@ const setCachedProfile = (profile) => {
   }
 };
 
+const getCachedChefUser = () => {
+  try {
+    const data = localStorage.getItem("stratizen_chef_user");
+    return data ? JSON.parse(data) : null;
+  } catch (err) {
+    return null;
+  }
+};
+
+const getCachedChefProfile = () => {
+  try {
+    const data = localStorage.getItem("stratizen_chef_profile");
+    return data ? JSON.parse(data) : null;
+  } catch (err) {
+    return null;
+  }
+};
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(() => {
+    const chefUser = getCachedChefUser();
+    if (chefUser) {
+      console.log("[Auth] Synchronous cache hit for Chef user:", chefUser.email);
+      return chefUser;
+    }
+    
     console.time("[Auth] Synchronous Cache Initialize");
     const cached = getCachedSession();
     console.timeEnd("[Auth] Synchronous Cache Initialize");
@@ -60,6 +85,12 @@ export const AuthProvider = ({ children }) => {
   });
 
   const [profile, setProfile] = useState(() => {
+    const chefProfile = getCachedChefProfile();
+    if (chefProfile) {
+      console.log("[Auth] Synchronous cache hit for Chef profile:", chefProfile.full_name);
+      return chefProfile;
+    }
+
     const cached = getCachedProfile();
     if (cached) {
       console.log("[Auth] Synchronous cache hit for profile:", cached.full_name);
@@ -68,6 +99,9 @@ export const AuthProvider = ({ children }) => {
   });
 
   const [loading, setLoading] = useState(() => {
+    if (getCachedChefUser()) {
+      return false;
+    }
     const cached = getCachedSession();
     if (cached?.user) {
       const cachedProfile = getCachedProfile();
@@ -119,6 +153,16 @@ export const AuthProvider = ({ children }) => {
       async (event, session) => {
         console.log(`[Auth] Auth state change event received: ${event}`);
         if (!isMounted) return;
+
+        // If Chef is logged in, ignore Supabase state changes
+        if (localStorage.getItem("stratizen_chef_user")) {
+          console.log("[Auth] Chef is logged in. Ignoring Supabase auth state change.");
+          setLoading(false);
+          try {
+            console.timeEnd("[Auth] Session Verification Event");
+          } catch {}
+          return;
+        }
 
         if (session?.user) {
           const currentUserId = session.user.id;
@@ -214,6 +258,34 @@ export const AuthProvider = ({ children }) => {
   const login = useCallback(async (email, password) => {
     console.time("[Auth] Login Process");
     try {
+      // Temporary Chef credentials check
+      if (email === "chef1@gmail.com") {
+        if (password === "12345678") {
+          const chefUser = {
+            id: "chef-mock-id",
+            email: "chef1@gmail.com",
+            user_metadata: { full_name: "Chef Anderson" }
+          };
+          const chefProfile = {
+            id: "chef-mock-id",
+            full_name: "Chef Anderson",
+            role: "chef"
+          };
+          
+          localStorage.setItem("stratizen_chef_user", JSON.stringify(chefUser));
+          localStorage.setItem("stratizen_chef_profile", JSON.stringify(chefProfile));
+          
+          setUser(chefUser);
+          setProfile(chefProfile);
+          setLoading(false);
+          
+          return { user: chefUser, session: { user: chefUser } };
+        } else {
+          throw new Error("Invalid email or password.");
+        }
+      }
+
+      // Standard student login
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -229,12 +301,21 @@ export const AuthProvider = ({ children }) => {
   const logout = useCallback(async () => {
     console.time("[Auth] Logout Process");
     try {
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
+      localStorage.removeItem("stratizen_chef_user");
+      localStorage.removeItem("stratizen_chef_profile");
       
-      // Clear cache on logout
+      // Clear student profile cache
       setProfile(null);
       setCachedProfile(null);
+      setUser(null);
+
+      // Sign out from Supabase if session exists
+      const { data } = await supabase.auth.getSession();
+      if (data?.session) {
+        await supabase.auth.signOut();
+      }
+    } catch (err) {
+      console.error("Error during sign out:", err);
     } finally {
       console.timeEnd("[Auth] Logout Process");
     }
