@@ -130,6 +130,7 @@ html.dark .chef-dashboard-container .bg-surface\/80 {
 
 /* Text Colors */
 .chef-dashboard-container .text-primary { color: var(--color-primary); }
+.chef-dashboard-container .text-on-primary { color: #ffffff; }
 .chef-dashboard-container .text-on-secondary-container { color: var(--color-on-secondary-container); }
 .chef-dashboard-container .text-on-surface { color: var(--color-on-surface); }
 .chef-dashboard-container .text-on-surface-variant { color: var(--color-on-surface-variant); }
