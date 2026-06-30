@@ -282,7 +282,7 @@ function ChefDashboard() {
             <span className="material-symbols-outlined">dashboard</span>
             <span className="font-label-lg text-label-lg">Kitchen Dashboard</span>
           </div>
-          <div className="flex items-center gap-md text-on-surface px-md py-sm hover:bg-surface-container-high rounded-lg cursor-pointer transition-all duration-200">
+          <div className="flex items-center gap-md text-on-surface px-md py-sm hover:bg-surface-container-high rounded-lg cursor-pointer transition-all duration-200" onClick={() => navigate("/chef/pending")}>
             <span className="material-symbols-outlined">receipt_long</span>
             <span className="font-label-lg text-label-lg">Order Queue</span>
           </div>
@@ -349,7 +349,7 @@ function ChefDashboard() {
           {/* Summary Bento Grid */}
           <section className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-lg">
             {/* Pending */}
-            <div className="bg-surface-container-lowest p-lg rounded-xl shadow-sm border-l-4 border-[#F57C00] flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div className="bg-surface-container-lowest p-lg rounded-xl shadow-sm border-l-4 border-[#F57C00] flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/chef/pending")}>
               <div className="flex justify-between items-start">
                 <div>
                   <p className="font-label-lg text-on-surface-variant">Pending Orders</p>

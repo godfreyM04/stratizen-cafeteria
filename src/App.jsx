@@ -15,6 +15,7 @@ import Checkout from "./pages/Checkout";
 import OrderTracking from "./pages/OrderTracking";
 import EditProfile from "./pages/EditProfile";
 import ChefDashboard from "./pages/ChefDashboard";
+import PendingOrders from "./pages/PendingOrders";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PublicRoute from "./components/PublicRoute";
 import "./styles/Toast.css";
@@ -125,6 +126,15 @@ function App() {
                 element={
                   <ProtectedRoute allowedRole="chef">
                     <ChefDashboard />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/chef/pending"
+                element={
+                  <ProtectedRoute allowedRole="chef">
+                    <PendingOrders />
                   </ProtectedRoute>
                 }
               />
