@@ -188,7 +188,11 @@ function ChefDashboard() {
           const allOrders = JSON.parse(stored);
           const updated = allOrders.map(o => {
             if (o.id === orderId || o.id.toString() === orderId.toString()) {
-              return { ...o, status: "preparing" };
+              return { 
+                ...o, 
+                status: 'preparing',
+                prepStartedAt: new Date().toISOString()
+              };
             }
             return o;
           });
@@ -364,21 +368,22 @@ function ChefDashboard() {
             </div>
 
             {/* Preparing */}
-            <div className="bg-surface-container-lowest p-lg rounded-xl shadow-sm border-l-4 border-primary flex flex-col justify-between hover:shadow-md transition-shadow">
+            <div className="bg-surface-container-lowest p-lg rounded-xl shadow-sm border-l-4 border-primary flex flex-col justify-between hover:shadow-md transition-shadow cursor-pointer" onClick={() => navigate("/chef/monitor")}>
               <div className="flex justify-between items-start">
                 <div>
-                  <p className="font-label-lg text-on-surface-variant">Preparing</p>
+                  <p className="font-label-lg text-on-surface-variant">In Preparation</p>
                   <h2 className="font-headline-lg text-headline-lg text-primary">{stats.preparing < 10 ? `0${stats.preparing}` : stats.preparing}</h2>
                 </div>
-                <span className="material-symbols-outlined text-primary bg-primary-fixed p-sm rounded-lg">chef_hat</span>
+                <span className="material-symbols-outlined text-primary bg-primary-container/10 p-sm rounded-lg">soup_kitchen</span>
               </div>
               <p className="text-[12px] text-on-surface-variant mt-md flex items-center gap-xs">
-                Avg. time: 14 mins
+                <span className="material-symbols-outlined text-sm">trending_up</span>
+                {stats.preparing} active in the kitchen
               </p>
             </div>
 
             {/* Ready */}
-            <div className="bg-surface-container-lowest p-lg rounded-xl shadow-sm border-l-4 flex flex-col justify-between hover:shadow-md transition-shadow border-outline-variant">
+            <div className="bg-surface-container-lowest p-lg rounded-xl shadow-sm border-l-4 flex flex-col justify-between hover:shadow-md transition-shadow border-outline-variant cursor-pointer" onClick={() => navigate("/chef/ready")}>
               <div className="flex justify-between items-start">
                 <div>
                   <p className="font-label-lg text-on-surface-variant">Ready to Collect</p>

@@ -98,6 +98,7 @@
 /* Backgrounds */
 .pending-orders-container .bg-surface-container-low { background-color: var(--color-surface-container-low); }
 .pending-orders-container .bg-surface-container { background-color: var(--color-surface-container); }
+.pending-orders-container .bg-secondary { background-color: var(--color-secondary); }
 .pending-orders-container .bg-secondary-container { background-color: var(--color-secondary-container); }
 .pending-orders-container .bg-surface-container-high { background-color: var(--color-surface-container-high); }
 .pending-orders-container .bg-surface-container-lowest { background-color: var(--color-surface-container-lowest); }

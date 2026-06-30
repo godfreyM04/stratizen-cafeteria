@@ -149,7 +149,11 @@ function PendingOrders() {
           const allOrders = JSON.parse(stored);
           const updated = allOrders.map(o => {
             if (o.id === orderId || o.id.toString() === orderId.toString()) {
-              return { ...o, status: "preparing" };
+              return { 
+                ...o, 
+                status: "preparing",
+                prepStartedAt: new Date().toISOString()
+              };
             }
             return o;
           });
