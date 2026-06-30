@@ -18,6 +18,7 @@ import ChefDashboard from "./pages/ChefDashboard";
 import PendingOrders from "./pages/PendingOrders";
 import KitchenMonitor from "./pages/KitchenMonitor";
 import ReadyForPickup from "./pages/ReadyForPickup";
+import OrderHistory from "./pages/OrderHistory";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PublicRoute from "./components/PublicRoute";
 import "./styles/Toast.css";
@@ -155,6 +156,15 @@ function App() {
                 element={
                   <ProtectedRoute allowedRole="chef">
                     <ReadyForPickup />
+                  </ProtectedRoute>
+                }
+              />
+
+              <Route
+                path="/chef/history"
+                element={
+                  <ProtectedRoute allowedRole="chef">
+                    <OrderHistory />
                   </ProtectedRoute>
                 }
               />

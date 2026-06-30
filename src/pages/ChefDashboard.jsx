@@ -395,7 +395,7 @@ function ChefDashboard() {
             </div>
 
             {/* Completed */}
-            <div className="bg-surface-container-lowest p-lg rounded-xl shadow-sm border-l-4 flex flex-col justify-between hover:shadow-md transition-shadow border-secondary">
+            <div className="bg-surface-container-lowest p-lg rounded-xl shadow-sm border-l-4 flex flex-col justify-between hover:shadow-md transition-shadow border-secondary cursor-pointer" onClick={() => navigate("/chef/history")}>
               <div className="flex justify-between items-start">
                 <div>
                   <p className="font-label-lg text-on-surface-variant">Completed</p>
