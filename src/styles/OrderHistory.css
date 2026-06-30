@@ -103,6 +103,7 @@
 .order-history-container .items-center { align-items: center; }
 .order-history-container .justify-center { justify-content: center; }
 .order-history-container .justify-between { justify-content: space-between; }
+.order-history-container .justify-end { justify-content: flex-end; }
 .order-history-container .items-start { align-items: flex-start; }
 .order-history-container .items-end { align-items: flex-end; }
 .order-history-container .text-center { text-align: center; }
