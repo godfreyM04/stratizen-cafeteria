@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import ChefNotificationCentre from "../components/ChefNotificationCentre";
 import ChefLogoutButton from "../components/ChefLogoutButton";
+import { generateDailyReport } from "../utils/generateDailyReport";
 import "../styles/OrderHistory.css";
 
 const formatKES = (price) => {
@@ -67,6 +68,9 @@ function OrderHistory() {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [activeMetric, setActiveMetric] = useState("volume"); // "volume" | "revenue" | "speed"
+  const [exportState, setExportState] = useState("idle"); // "idle" | "fetching" | "generating" | "success" | "error"
+  const [exportMessage, setExportMessage] = useState("");
+  const toastTimeoutRef = useRef(null);
 
   // KPI States
   const [totalTodayCount, setTotalTodayCount] = useState(0);
@@ -218,34 +222,39 @@ function OrderHistory() {
   const indexOfFirstOrder = indexOfLastOrder - ordersPerPage;
   const currentOrders = filteredOrders.slice(indexOfFirstOrder, indexOfLastOrder);
 
-  // CSV Exporter
-  const handleExportCSV = () => {
-    if (orders.length === 0) {
-      alert("No completed orders to export.");
-      return;
-    }
-    const headers = ["Order ID", "Student Name", "Items Ordered", "Placed At", "Prep Started At", "Ready At", "Collected At", "Total KES"];
-    const rows = orders.map(o => [
-      `STR-${o.id.substring(0, 8).toUpperCase()}`,
-      o.name,
-      o.items,
-      o.placedAt,
-      o.prepStartedAt || "",
-      o.readyAt || "",
-      o.collectedAt || "",
-      o.total
-    ]);
+  // PDF Report Exporter
+  const handleExportPDF = async () => {
+    if (exportState === "fetching" || exportState === "generating") return;
 
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers.join(","), ...rows.map(e => e.map(val => `"${val}"`).join(","))].join("\n");
-    
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Stratizen_Completed_Orders_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    // Clear any existing toast
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+
+    setExportState("fetching");
+    setExportMessage("Fetching today's data...");
+
+    const result = await generateDailyReport((phase) => {
+      if (phase === "fetching") {
+        setExportState("fetching");
+        setExportMessage("Fetching today's data...");
+      } else if (phase === "generating") {
+        setExportState("generating");
+        setExportMessage("Generating PDF report...");
+      }
+    });
+
+    if (result.success) {
+      setExportState("success");
+      setExportMessage(`Report exported successfully — ${result.filename}`);
+    } else {
+      setExportState("error");
+      setExportMessage(`Export failed: ${result.error}. Please try again.`);
+    }
+
+    // Auto-dismiss toast after 5 seconds
+    toastTimeoutRef.current = setTimeout(() => {
+      setExportState("idle");
+      setExportMessage("");
+    }, 5000);
   };
 
   // Calculate bar heights for peak ordering times chart
@@ -356,12 +365,26 @@ function OrderHistory() {
               <p className="text-body-lg text-on-surface-variant">Manage and review student transactions</p>
             </div>
             <button 
-              className="flex items-center gap-sm px-lg py-2.5 bg-primary text-on-primary rounded-lg font-label-lg hover:shadow-lg active:opacity-80 transition-all border-none cursor-pointer"
+              className={`flex items-center gap-sm px-lg py-2.5 rounded-lg font-label-lg transition-all border-none cursor-pointer ${
+                exportState === "fetching" || exportState === "generating"
+                  ? "bg-primary/60 text-on-primary cursor-wait"
+                  : "bg-primary text-on-primary hover:shadow-lg active:opacity-80"
+              }`}
               type="button"
-              onClick={handleExportCSV}
+              onClick={handleExportPDF}
+              disabled={exportState === "fetching" || exportState === "generating"}
             >
-              <span className="material-symbols-outlined">file_download</span>
-              <span>Export Today's Report</span>
+              {exportState === "fetching" || exportState === "generating" ? (
+                <>
+                  <span className="material-symbols-outlined animate-spin" style={{ fontSize: "18px" }}>sync</span>
+                  <span>{exportState === "fetching" ? "Fetching Data..." : "Generating PDF..."}</span>
+                </>
+              ) : (
+                <>
+                  <span className="material-symbols-outlined">picture_as_pdf</span>
+                  <span>Export Today's Report</span>
+                </>
+              )}
             </button>
           </div>
 
@@ -576,6 +599,30 @@ function OrderHistory() {
 
         </div>
       </main>
+
+      {/* Toast Notification */}
+      {(exportState === "success" || exportState === "error") && (
+        <div
+          className={`fixed bottom-6 right-6 z-50 flex items-center gap-sm px-lg py-md rounded-xl shadow-xl border transition-all animate-slideUp ${
+            exportState === "success"
+              ? "bg-secondary-container text-on-secondary-container border-secondary/30"
+              : "bg-error-container text-on-error-container border-error/30"
+          }`}
+          style={{ maxWidth: "420px", animation: "slideUp 0.3s ease-out" }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: "20px" }}>
+            {exportState === "success" ? "check_circle" : "error"}
+          </span>
+          <p className="text-body-md font-medium flex-1">{exportMessage}</p>
+          <button
+            className="border-none bg-transparent cursor-pointer text-on-surface-variant hover:text-on-surface p-1 rounded"
+            type="button"
+            onClick={() => { setExportState("idle"); setExportMessage(""); }}
+          >
+            <span className="material-symbols-outlined" style={{ fontSize: "16px" }}>close</span>
+          </button>
+        </div>
+      )}
 
     </div>
   );

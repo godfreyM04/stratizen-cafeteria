@@ -335,3 +335,25 @@ html.dark .order-history-container tr.hover\:bg-surface-container-low\/50\:hover
     margin-left: 64px;
   }
 }
+
+/* Toast notification positioning */
+.order-history-container .bottom-6 { bottom: 24px; }
+.order-history-container .right-6 { right: 24px; }
+.order-history-container .cursor-wait { cursor: wait; }
+.order-history-container .p-1 { padding: 4px; }
+
+/* Animation for toast */
+@keyframes slideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.order-history-container .animate-slideUp {
+  animation: slideUp 0.3s ease-out;
+}
