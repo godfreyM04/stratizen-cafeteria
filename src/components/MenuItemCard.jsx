@@ -23,18 +23,21 @@ const MenuItemCard = ({ item }) => {
     addToast(`Added the ${item.name} to the tray`);
   };
 
-  const isAvailable = item.availability === "Available";
+  const isAvailable = item.availability === "Available" || item.availability === true;
+  const availabilityText = typeof item.availability === "boolean" 
+    ? (item.availability ? "Available" : "Unavailable") 
+    : (item.availability || "Available");
   const trayItem = trayItems.find((i) => i.id === item.id);
 
   return (
     <article className="menu-item-card" onClick={handleCardClick}>
       <div className="card-image-wrapper">
-        <img src={item.image} alt={item.name} className="card-food-image" />
+        <img src={item.image_url || item.image} alt={item.name} className="card-food-image" />
         <span className={`availability-tag ${isAvailable ? "available" : "limited"}`}>
           <span className="material-symbols-outlined tag-icon">
             {isAvailable ? "check_circle" : "warning"}
           </span>
-          {item.availability}
+          {availabilityText}
         </span>
       </div>
       <div className="card-details">

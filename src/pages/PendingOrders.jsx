@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "../context/ToastContext";
+import { supabase } from "../lib/supabase";
+import ChefNotificationCentre from "../components/ChefNotificationCentre";
+import ChefLogoutButton from "../components/ChefLogoutButton";
 import "../styles/PendingOrders.css";
 
 // Helper to get initials from name
@@ -47,144 +51,89 @@ function PendingOrders() {
   const [processingOrders, setProcessingOrders] = useState({});
   const [loading, setLoading] = useState(true);
 
-  // Load and sync pending orders from localStorage
-  useEffect(() => {
-    const loadOrders = () => {
-      let allOrders = [];
-      const stored = localStorage.getItem("stratizen_chef_orders");
-      if (stored) {
-        try {
-          allOrders = JSON.parse(stored);
-        } catch (e) {
-          console.error("Failed to parse chef orders:", e);
-        }
-      }
+  const loadPendingOrders = async () => {
+    try {
+      const { data: pendingData, error: fetchError } = await supabase
+        .from("orders")
+        .select("*, order_items(*, menu(*))")
+        .eq("status", "pending")
+        .order("created_at", { ascending: true });
 
-      // Check for active student orders in localStorage
-      const activeOrderStr = localStorage.getItem("stratizen_active_order");
-      if (activeOrderStr) {
-        try {
-          const activeOrder = JSON.parse(activeOrderStr);
-          const exists = allOrders.some(o => o.id === activeOrder.id || o.id.toString() === activeOrder.id.toString());
+      if (fetchError) throw fetchError;
 
-          if (!exists && activeOrder.status !== "collected") {
-            const formattedItems = activeOrder.items
-              ? activeOrder.items.map(i => `${i.quantity}x ${i.name}`).join(", ")
-              : "1x Custom Order";
+      const mapped = (pendingData || []).map(o => ({
+        id: o.id,
+        name: o.student_name || "Student",
+        items: (o.order_items || []).map(oi => `${oi.quantity}x ${oi.menu?.name || 'Meal'}`).join(", "),
+        placedAt: o.created_at,
+        total: parseFloat(o.total),
+        itemsList: (o.order_items || []).map(oi => ({
+          name: oi.menu?.name || "Meal",
+          quantity: oi.quantity,
+          price: parseFloat(oi.unit_price)
+        }))
+      }));
 
-            const newOrder = {
-              id: activeOrder.id,
-              name: activeOrder.items?.[0]?.name ? `${activeOrder.items[0].quantity}x ${activeOrder.items[0].name}` : "Student Order",
-              items: formattedItems,
-              time: "Placed just now",
-              placedAt: activeOrder.placedAt || new Date().toISOString(),
-              status: activeOrder.status || "pending",
-              total: activeOrder.total || 0,
-              itemsList: activeOrder.items || []
-            };
-
-            allOrders.unshift(newOrder);
-            localStorage.setItem("stratizen_chef_orders", JSON.stringify(allOrders));
-          }
-        } catch (e) {
-          console.error("Failed to parse active student order:", e);
-        }
-      }
-
-      // Filter only pending/received orders
-      const pendingList = allOrders.filter(o => o.status === "pending" || o.status === "received");
-
-      // Map and ensure itemsList and total are populated for display
-      const mappedList = pendingList.map(o => {
-        // If itemsList is missing, try to parse from the text items string
-        let itemsList = o.itemsList || [];
-        let total = o.total || 0;
-
-        if (itemsList.length === 0 && o.items) {
-          // Fallback parsing for mock data
-          const parts = o.items.split(", ");
-          parts.forEach(part => {
-            const match = part.match(/(\d+)x\s+(.+)/);
-            if (match) {
-              const qty = parseInt(match[1], 10);
-              const name = match[2];
-              // Estimate price for mock items
-              let price = 300;
-              if (name.toLowerCase().includes("burger")) price = 450;
-              else if (name.toLowerCase().includes("fries")) price = 180;
-              else if (name.toLowerCase().includes("salad")) price = 350;
-              else if (name.toLowerCase().includes("matcha")) price = 180;
-              else if (name.toLowerCase().includes("ramen")) price = 420;
-              else if (name.toLowerCase().includes("smoothie")) price = 220;
-
-              itemsList.push({ name, quantity: qty, price: price });
-              total += qty * price;
-            }
-          });
-        }
-
-        return {
-          ...o,
-          itemsList,
-          total: total || 350 // Fallback total
-        };
-      });
-
-      setOrders(mappedList);
+      setOrders(mapped);
+    } catch (err) {
+      console.error("Failed to load pending orders:", err.message);
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
-    loadOrders();
-    const interval = setInterval(loadOrders, 2000);
-    return () => clearInterval(interval);
+  useEffect(() => {
+    loadPendingOrders();
+
+    // Subscribe to changes on the orders table in real-time
+    const orderSubscription = supabase
+      .channel("chef_pending_orders_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => {
+          console.log("Real-time update in pending orders");
+          loadPendingOrders();
+        }
+      )
+      .subscribe();
+
+    // Refresh elapsed time labels every 30 seconds
+    const interval = setInterval(() => {
+      loadPendingOrders();
+    }, 30000);
+
+    return () => {
+      orderSubscription.unsubscribe();
+      clearInterval(interval);
+    };
   }, []);
 
-  const handleStartPreparing = (orderId) => {
+  const handleStartPreparing = async (orderId) => {
     setProcessingOrders(prev => ({ ...prev, [orderId]: true }));
 
-    setTimeout(() => {
-      const stored = localStorage.getItem("stratizen_chef_orders");
-      if (stored) {
-        try {
-          const allOrders = JSON.parse(stored);
-          const updated = allOrders.map(o => {
-            if (o.id === orderId || o.id.toString() === orderId.toString()) {
-              return { 
-                ...o, 
-                status: "preparing",
-                prepStartedAt: new Date().toISOString()
-              };
-            }
-            return o;
-          });
-          localStorage.setItem("stratizen_chef_orders", JSON.stringify(updated));
-        } catch (e) {
-          console.error(e);
-        }
-      }
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          status: "preparing",
+          prep_started_at: new Date().toISOString()
+        })
+        .eq("id", orderId);
 
-      // Update the active student order if it matches
-      const activeOrderStr = localStorage.getItem("stratizen_active_order");
-      if (activeOrderStr) {
-        try {
-          const activeOrder = JSON.parse(activeOrderStr);
-          if (activeOrder.id === orderId || activeOrder.id.toString() === orderId.toString()) {
-            activeOrder.status = "preparing";
-            activeOrder.simulatedStatus = "preparing";
-            localStorage.setItem("stratizen_active_order", JSON.stringify(activeOrder));
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }
+      if (error) throw error;
 
       setOrders(prev => prev.filter(o => o.id !== orderId));
+    } catch (err) {
+      console.error("Failed to start preparing order:", err.message);
+      alert("Failed to update order status: " + err.message);
+    } finally {
       setProcessingOrders(prev => {
         const copy = { ...prev };
         delete copy[orderId];
         return copy;
       });
-    }, 1000);
+    }
   };
 
   const handleLogout = async () => {
@@ -227,33 +176,30 @@ function PendingOrders() {
             <span className="material-symbols-outlined">dashboard</span>
             <span className="font-label-lg text-label-lg">Kitchen Dashboard</span>
           </div>
+          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all cursor-pointer rounded-lg" onClick={() => navigate("/chef/menu")}>
+            <span className="material-symbols-outlined">restaurant_menu</span>
+            <span className="font-label-lg text-label-lg">Menu Manager</span>
+          </div>
           <div className="flex items-center gap-md bg-secondary-container text-on-secondary-container rounded-lg px-md py-sm cursor-pointer shadow-sm">
             <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>receipt_long</span>
             <span className="font-label-lg text-label-lg">Order Queue</span>
           </div>
-          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all cursor-pointer rounded-lg">
-            <span className="material-symbols-outlined">restaurant_menu</span>
-            <span className="font-label-lg text-label-lg">Menu Manager</span>
+          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all cursor-pointer rounded-lg" onClick={() => navigate("/chef/monitor")}>
+            <span className="material-symbols-outlined">soup_kitchen</span>
+            <span className="font-label-lg text-label-lg">Kitchen Monitor</span>
           </div>
-          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all cursor-pointer rounded-lg">
-            <span className="material-symbols-outlined">bar_chart</span>
-            <span className="font-label-lg text-label-lg">Analytics</span>
+          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all cursor-pointer rounded-lg" onClick={() => navigate("/chef/ready")}>
+            <span className="material-symbols-outlined">storefront</span>
+            <span className="font-label-lg text-label-lg">Ready to Collect</span>
           </div>
-          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all cursor-pointer rounded-lg">
-            <span className="material-symbols-outlined">groups</span>
-            <span className="font-label-lg text-label-lg">Staff Settings</span>
+          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all cursor-pointer rounded-lg" onClick={() => navigate("/chef/history")}>
+            <span className="material-symbols-outlined">history</span>
+            <span className="font-label-lg text-label-lg">Order History</span>
           </div>
         </nav>
 
-        <div className="mt-auto px-sm flex flex-col gap-xs">
-          <button className="w-full text-left flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all cursor-pointer rounded-lg" type="button">
-            <span className="material-symbols-outlined">help</span>
-            <span className="font-label-lg text-label-lg">Help Center</span>
-          </button>
-          <button className="w-full text-left flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all cursor-pointer rounded-lg" type="button" onClick={handleLogout}>
-            <span className="material-symbols-outlined text-error">logout</span>
-            <span className="font-label-lg text-label-lg text-error">Logout</span>
-          </button>
+        <div className="px-md mt-auto pt-lg border-t border-outline-variant/30 space-y-xs">
+          <ChefLogoutButton />
         </div>
       </aside>
 
@@ -275,10 +221,7 @@ function PendingOrders() {
             </div>
           </div>
           <div className="flex items-center gap-lg">
-            <div className="flex items-center gap-sm px-md py-xs bg-primary-container/10 rounded-full">
-              <span className="material-symbols-outlined text-primary text-body-lg">notifications</span>
-              <span className="w-2 h-2 bg-error rounded-full -ml-3 mb-3"></span>
-            </div>
+            <ChefNotificationCentre />
             <div className="flex items-center gap-md">
               <div className="text-right hidden sm:block">
                 <p className="font-label-lg text-label-lg text-on-surface">Chef Anderson</p>
@@ -335,7 +278,6 @@ function PendingOrders() {
             <div className="order-grid">
               {filteredOrders.map((order) => {
                 const colorScheme = getInitialsColorClass(order.id);
-                // Check if placed within the last 5 minutes
                 const isNew = (Date.now() - new Date(order.placedAt).getTime()) < 300000;
 
                 return (
@@ -347,7 +289,7 @@ function PendingOrders() {
                         </div>
                         <div>
                           <h3 className="font-title-lg text-body-lg font-bold text-on-surface">{order.name}</h3>
-                          <p className="text-xs text-on-surface-variant">Order #{order.id} • {getElapsedTime(order.placedAt)}</p>
+                          <p className="text-xs text-on-surface-variant">Order #STR-{order.id.substring(0, 4).toUpperCase()} • {getElapsedTime(order.placedAt)}</p>
                         </div>
                       </div>
                       {isNew && (

@@ -1,8 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTray } from "../context/TrayContext";
 import { useToast } from "../context/ToastContext";
-import { mockMenuItems } from "../data/mockMenu";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 import AuthLayout from "../components/AuthLayout";
 import QuantityCounter from "../components/QuantityCounter";
 import "../styles/Orders.css";
@@ -13,11 +14,11 @@ const formatKES = (price) => {
 
 const getCategoryIcon = (category) => {
   switch (category?.toLowerCase()) {
-    case "drinks": return "coffee";
+    case "beverages": return "coffee";
     case "breakfast": return "free_breakfast";
     case "lunch": return "restaurant";
     case "dinner": return "dinner_dining";
-    case "snacks": return "cookie";
+    case "sides": return "cookie";
     default: return "restaurant";
   }
 };
@@ -53,6 +54,7 @@ const formatRecentOrderTime = (isoString) => {
 };
 
 function Orders() {
+  const { user } = useAuth();
   const {
     trayItems,
     itemCount,
@@ -65,32 +67,52 @@ function Orders() {
   const { addToast } = useToast();
   const navigate = useNavigate();
 
-  const [walletBalance] = useState(() => {
-    const cached = localStorage.getItem("stratizen_wallet_balance");
-    return cached ? parseFloat(cached) : 42.50;
-  });
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [recentOrders, setRecentOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const [recentOrders] = useState(() => {
-    const historyJson = localStorage.getItem("stratizen_order_history");
-    if (historyJson) {
+  useEffect(() => {
+    if (!user) return;
+
+    const loadOrdersData = async () => {
       try {
-        const history = JSON.parse(historyJson);
-        const itemMap = new Map();
+        // 1. Fetch wallet balance from Supabase
+        const { data: wallet } = await supabase
+          .from("wallets")
+          .select("balance")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        if (wallet) {
+          setWalletBalance(parseFloat(wallet.balance));
+        }
 
-        // Populate the items while preserving the most recent order date
-        history.forEach((order) => {
-          if (order.items && Array.isArray(order.items)) {
-            order.items.forEach((orderItem) => {
-              // Ensure item still exists in Menu database
-              const menuMatch = mockMenuItems.find(m => m.id === orderItem.id);
-              if (menuMatch) {
-                const existing = itemMap.get(orderItem.id);
-                if (!existing || new Date(order.placedAt) > new Date(existing.placedAt)) {
-                  itemMap.set(orderItem.id, {
-                    ...menuMatch,
-                    placedAt: order.placedAt,
-                    time: formatRecentOrderTime(order.placedAt),
-                    icon: getCategoryIcon(menuMatch.category)
+        // 2. Fetch order history from Supabase
+        const { data: ordersData, error: ordersError } = await supabase
+          .from("orders")
+          .select("*, order_items(*, menu(*))")
+          .eq("user_id", user.id)
+          .order("created_at", { ascending: false });
+
+        if (ordersError) throw ordersError;
+
+        // Map order items to unique recent menu items
+        const itemMap = new Map();
+        (ordersData || []).forEach((order) => {
+          if (order.order_items) {
+            order.order_items.forEach((oi) => {
+              if (oi.menu) {
+                const menuItem = oi.menu;
+                if (!itemMap.has(menuItem.id)) {
+                  itemMap.set(menuItem.id, {
+                    id: menuItem.id,
+                    name: menuItem.name,
+                    price: parseFloat(menuItem.price),
+                    image: menuItem.image_url || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c",
+                    category: menuItem.category,
+                    description: menuItem.description,
+                    placedAt: order.created_at,
+                    time: formatRecentOrderTime(order.created_at),
+                    icon: getCategoryIcon(menuItem.category)
                   });
                 }
               }
@@ -98,16 +120,16 @@ function Orders() {
           }
         });
 
-        // Convert Map to array sorted by placedAt date descending
-        return Array.from(itemMap.values()).sort(
-          (a, b) => new Date(b.placedAt) - new Date(a.placedAt)
-        );
-      } catch (e) {
-        console.error("Failed to parse order history:", e);
+        setRecentOrders(Array.from(itemMap.values()));
+      } catch (err) {
+        console.error("Failed to load orders page data:", err.message);
+      } finally {
+        setLoading(false);
       }
-    }
-    return [];
-  });
+    };
+
+    loadOrdersData();
+  }, [user]);
 
   const handleReorder = (item) => {
     addToTray(
@@ -127,6 +149,17 @@ function Orders() {
   const handleCheckout = () => {
     navigate("/checkout");
   };
+
+  if (loading) {
+    return (
+      <AuthLayout>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-md">
+          <span className="material-symbols-outlined animate-spin text-[48px] text-primary">sync</span>
+          <p className="text-on-surface-variant font-medium">Loading tray details...</p>
+        </div>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>
@@ -203,7 +236,7 @@ function Orders() {
                       <p className="recents-price">KES {formatKES(order.price)}</p>
                     </div>
                     <button
-                      className="recents-reorder-btn"
+                      className="recents-reorder-btn cursor-pointer border-none"
                       onClick={() => handleReorder(order)}
                       title="Reorder"
                     >
@@ -236,7 +269,7 @@ function Orders() {
               <div className="wallet-balance">KES {formatKES(walletBalance)}</div>
               <p className="wallet-balance-label">Available Balance</p>
               <button
-                className="wallet-topup-btn"
+                className="wallet-topup-btn cursor-pointer border-none"
                 onClick={() => navigate("/wallet")}
               >
                 Top Up Balance
@@ -269,7 +302,7 @@ function Orders() {
               </div>
             </div>
             <button
-              className="summary-pay-btn"
+              className="summary-pay-btn cursor-pointer border-none"
               onClick={handleCheckout}
               disabled={trayItems.length === 0}
             >

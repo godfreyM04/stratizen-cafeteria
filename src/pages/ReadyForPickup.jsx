@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase";
+import ChefNotificationCentre from "../components/ChefNotificationCentre";
+import ChefLogoutButton from "../components/ChefLogoutButton";
 import "../styles/ReadyForPickup.css";
 
 // Helper to format simple elapsed time (e.g., "Ready 4m ago")
@@ -19,8 +22,10 @@ function ReadyForPickup() {
   const [searchTerm, setSearchTerm] = useState("");
   const [processingCollected, setProcessingCollected] = useState({});
   const [loading, setLoading] = useState(true);
-  const [currentTime, setCurrentTime] = useState(Date.now());
+  const [currentTime, setCurrentTime] = useState(() => Date.now());
   const [scanModal, setScanModal] = useState(null); // { orderId, studentName } or null
+  const [manualIdInput, setManualIdInput] = useState("");
+  const [showManualInput, setShowManualInput] = useState(false);
 
   // Keep current time ticking every second for elapsed timers
   useEffect(() => {
@@ -30,169 +35,117 @@ function ReadyForPickup() {
     return () => clearInterval(timer);
   }, []);
 
-  // Load and sync ready orders from localStorage
-  useEffect(() => {
-    const loadOrders = () => {
-      let allOrders = [];
-      const stored = localStorage.getItem("stratizen_chef_orders");
-      if (stored) {
-        try {
-          allOrders = JSON.parse(stored);
-        } catch (e) {
-          console.error("Failed to parse chef orders:", e);
-        }
-      }
+  const loadReadyOrders = async () => {
+    try {
+      const { data: readyData, error: fetchError } = await supabase
+        .from("orders")
+        .select("*, order_items(*, menu(*))")
+        .eq("status", "ready")
+        .order("ready_at", { ascending: true });
 
-      // Check for active student orders in localStorage
-      const activeOrderStr = localStorage.getItem("stratizen_active_order");
-      if (activeOrderStr) {
-        try {
-          const activeOrder = JSON.parse(activeOrderStr);
-          const exists = allOrders.some(o => o.id === activeOrder.id || o.id.toString() === activeOrder.id.toString());
-          
-          if (!exists && activeOrder.status !== "collected") {
-            const formattedItems = activeOrder.items
-              ? activeOrder.items.map(i => `${i.quantity}x ${i.name}`).join(", ")
-              : "1x Custom Order";
-              
-            const newOrder = {
-              id: activeOrder.id,
-              name: activeOrder.items?.[0]?.name ? `${activeOrder.items[0].quantity}x ${activeOrder.items[0].name}` : "Student Order",
-              items: formattedItems,
-              time: "Placed just now",
-              placedAt: activeOrder.placedAt || new Date().toISOString(),
-              status: activeOrder.status || "pending",
-              total: activeOrder.total || 0,
-              itemsList: activeOrder.items || []
-            };
-            
-            allOrders.unshift(newOrder);
-            localStorage.setItem("stratizen_chef_orders", JSON.stringify(allOrders));
-          } else if (exists) {
-            // Update status in chef orders if active student order status changed
-            allOrders = allOrders.map(o => {
-              if (o.id === activeOrder.id || o.id.toString() === activeOrder.id.toString()) {
-                return { ...o, status: activeOrder.status };
-              }
-              return o;
-            });
-          }
-        } catch (e) {
-          console.error("Failed to parse active student order:", e);
-        }
-      }
+      if (fetchError) throw fetchError;
 
-      // Filter only ready orders
-      const readyList = allOrders.filter(o => o.status === "ready");
-      
-      // Ensure readyAt is set
-      const mappedList = readyList.map(o => {
-        let itemsList = o.itemsList || [];
-        if (itemsList.length === 0 && o.items) {
-          const parts = o.items.split(", ");
-          parts.forEach(part => {
-            const match = part.match(/(\d+)x\s+(.+)/);
-            if (match) {
-              itemsList.push({ name: match[2], quantity: parseInt(match[1], 10) });
-            }
-          });
-        }
+      const mapped = (readyData || []).map(o => ({
+        id: o.id,
+        name: o.student_name || "Student",
+        items: (o.order_items || []).map(oi => `${oi.quantity}x ${oi.menu?.name || 'Meal'}`).join(", "),
+        total: parseFloat(o.total),
+        placedAt: o.created_at,
+        readyAt: o.ready_at || o.created_at,
+        itemsList: (o.order_items || []).map(oi => ({
+          name: oi.menu?.name || "Meal",
+          quantity: oi.quantity
+        }))
+      }));
 
-        // If readyAt is missing, estimate it
-        let readyAt = o.readyAt;
-        if (!readyAt) {
-          if (o.prepStartedAt) {
-            readyAt = new Date(new Date(o.prepStartedAt).getTime() + 10 * 60000).toISOString();
-          } else {
-            readyAt = new Date(Date.now() - 120000).toISOString();
-          }
-        }
-
-        return {
-          ...o,
-          itemsList,
-          readyAt
-        };
-      });
-
-      setOrders(mappedList);
+      setOrders(mapped);
+    } catch (err) {
+      console.error("Failed to load ready orders:", err.message);
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
-    loadOrders();
-    const interval = setInterval(loadOrders, 2000);
-    return () => clearInterval(interval);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadReadyOrders();
+
+    // Subscribe to changes on the orders table in real-time
+    const orderSubscription = supabase
+      .channel("chef_ready_orders_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => {
+          console.log("Real-time update in ready orders");
+          loadReadyOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      orderSubscription.unsubscribe();
+    };
   }, []);
 
-  const handleMarkCollected = (orderId) => {
+  const handleMarkCollected = async (orderId) => {
     setProcessingCollected(prev => ({ ...prev, [orderId]: true }));
 
-    setTimeout(() => {
-      const stored = localStorage.getItem("stratizen_chef_orders");
-      if (stored) {
-        try {
-          const allOrders = JSON.parse(stored);
-          const updated = allOrders.map(o => {
-            if (o.id === orderId || o.id.toString() === orderId.toString()) {
-              return { 
-                ...o, 
-                status: "collected",
-                collectedAt: new Date().toISOString()
-              };
-            }
-            return o;
-          });
-          localStorage.setItem("stratizen_chef_orders", JSON.stringify(updated));
-        } catch (e) {
-          console.error(e);
-        }
-      }
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          status: "collected",
+          collected_at: new Date().toISOString()
+        })
+        .eq("id", orderId);
 
-      // Update the active student order if it matches
-      const activeOrderStr = localStorage.getItem("stratizen_active_order");
-      if (activeOrderStr) {
-        try {
-          const activeOrder = JSON.parse(activeOrderStr);
-          if (activeOrder.id === orderId || activeOrder.id.toString() === orderId.toString()) {
-            activeOrder.status = "collected";
-            activeOrder.simulatedStatus = "collected";
-            localStorage.setItem("stratizen_active_order", JSON.stringify(activeOrder));
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }
+      if (error) throw error;
 
       setOrders(prev => prev.filter(o => o.id !== orderId));
+      if (scanModal && scanModal.orderId === orderId) {
+        setScanModal(null);
+      }
+    } catch (err) {
+      console.error("Failed to mark order as collected:", err.message);
+      alert("Failed to update order status: " + err.message);
+    } finally {
       setProcessingCollected(prev => {
         const copy = { ...prev };
         delete copy[orderId];
         return copy;
       });
-    }, 800);
+    }
   };
 
-  const handleQuickScan = () => {
-    // If we have ready orders, scan the first one. Otherwise simulate a default scan.
-    if (orders.length > 0) {
-      const targetOrder = orders[0];
-      setScanModal({
-        orderId: targetOrder.id,
-        studentName: targetOrder.name || "Marcus Thompson"
-      });
+  const handleManualCollect = async (e) => {
+    e.preventDefault();
+    if (!manualIdInput.trim()) return;
+
+    // Try to find the order by ID match (fuzzy match from start or full ID)
+    const match = orders.find(o => 
+      o.id.toLowerCase().includes(manualIdInput.toLowerCase()) || 
+      `STR-${o.id.substring(0, 4).toUpperCase()}`.includes(manualIdInput.toUpperCase())
+    );
+
+    if (match) {
+      await handleMarkCollected(match.id);
+      setManualIdInput("");
+      setShowManualInput(false);
+      alert("Order marked as collected successfully!");
     } else {
-      setScanModal({
-        orderId: "B-2033",
-        studentName: "David Wilson"
-      });
+      alert("Order ID not found in the ready queue.");
     }
   };
 
-  const handleDismissScan = () => {
-    if (scanModal && scanModal.orderId !== "B-2033") {
-      handleMarkCollected(scanModal.orderId);
+  const handleQuickCollectScan = () => {
+    if (orders.length === 0) {
+      alert("No orders currently awaiting pickup.");
+      return;
     }
-    setScanModal(null);
+    // Simulate scanning the first order in the queue
+    const firstOrder = orders[0];
+    setScanModal({ orderId: firstOrder.id, studentName: firstOrder.name });
   };
 
   const handleLogout = async () => {
@@ -204,122 +157,135 @@ function ReadyForPickup() {
     }
   };
 
-  // Filter orders by search term (search by ID or student name)
+  // Filter orders by search term
   const filteredOrders = orders.filter(order => {
     const query = searchTerm.toLowerCase();
     const nameMatch = order.name?.toLowerCase().includes(query);
     const idMatch = order.id?.toString().includes(query);
-    return nameMatch || idMatch;
+    const orderNoMatch = `STR-${order.id.substring(0, 4).toUpperCase()}`.toLowerCase().includes(query);
+    const itemsMatch = order.items?.toLowerCase().includes(query);
+    return nameMatch || idMatch || orderNoMatch || itemsMatch;
   });
 
+  // Calculate stats
+  const activeCount = orders.length;
+  // Calculate average wait time for ready orders
+  const getAvgWaitTime = () => {
+    if (orders.length === 0) return "0m 0s";
+    const totalMs = orders.reduce((sum, o) => sum + (currentTime - new Date(o.readyAt).getTime()), 0);
+    const avgMs = totalMs / orders.length;
+    const avgMins = Math.floor(avgMs / 60000);
+    const avgSecs = Math.floor((avgMs % 60000) / 1000);
+    return `${avgMins}m ${avgSecs}s`;
+  };
+
   return (
-    <div className="ready-pickup-container text-on-surface min-h-screen flex">
-      
-      {/* Sidebar Navigation */}
-      <aside className="hidden md:flex flex-col h-screen w-64 fixed left-0 top-0 z-50 border-r border-outline-variant bg-surface-container-low py-lg shrink-0">
+    <div className="ready-pickup-container text-on-background min-h-screen flex">
+
+      {/* SideNavBar */}
+      <aside className="hidden md:flex flex-col h-screen w-64 fixed left-0 top-0 z-50 border-r border-outline-variant bg-surface-container-low py-lg">
         <div className="px-md mb-xl">
-          <h1 className="text-headline-lg text-primary flex items-center gap-sm font-bold">
-            <span className="material-symbols-outlined text-primary text-[28px]">restaurant</span>
+          <h1 className="text-headline-lg text-primary flex items-center font-bold">
+            <span className="material-symbols-outlined text-primary mr-sm" style={{ verticalAlign: "middle" }}>restaurant</span>
             Stratizen Dining
           </h1>
           <p className="text-label-md text-on-surface-variant mt-xs">Chef Management Portal</p>
         </div>
-        
-        <nav className="flex-1 px-sm space-y-xs">
+
+        <nav className="flex-grow px-sm space-y-xs">
           <div className="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer" onClick={() => navigate("/chef/dashboard")}>
             <span className="material-symbols-outlined">dashboard</span>
             <span className="text-label-lg">Kitchen Dashboard</span>
+          </div>
+          <div className="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer" onClick={() => navigate("/chef/menu")}>
+            <span className="material-symbols-outlined">restaurant_menu</span>
+            <span className="text-label-lg">Menu Manager</span>
           </div>
           <div className="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer" onClick={() => navigate("/chef/pending")}>
             <span className="material-symbols-outlined">receipt_long</span>
             <span className="text-label-lg">Order Queue</span>
           </div>
-          <div className="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer">
-            <span className="material-symbols-outlined">restaurant_menu</span>
-            <span className="text-label-lg">Menu Manager</span>
+          <div className="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer" onClick={() => navigate("/chef/monitor")}>
+            <span className="material-symbols-outlined">soup_kitchen</span>
+            <span className="text-label-lg">Kitchen Monitor</span>
           </div>
-          <div className="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer">
-            <span className="material-symbols-outlined">bar_chart</span>
-            <span className="text-label-lg">Analytics</span>
+          <div className="flex items-center gap-md px-md py-sm rounded-lg bg-secondary-container text-on-secondary-container cursor-pointer font-bold shadow-sm">
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>storefront</span>
+            <span className="text-label-lg">Ready to Collect</span>
           </div>
-          <div className="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer">
-            <span className="material-symbols-outlined">groups</span>
-            <span className="text-label-lg">Staff Settings</span>
+          <div className="flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors cursor-pointer" onClick={() => navigate("/chef/history")}>
+            <span className="material-symbols-outlined">history</span>
+            <span className="text-label-lg">Order History</span>
           </div>
         </nav>
-        
-        <div className="px-sm space-y-xs">
-          <button className="w-full text-left flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors border-none bg-transparent" type="button">
-            <span className="material-symbols-outlined">help</span>
-            <span className="text-label-lg">Help Center</span>
-          </button>
-          <button className="w-full text-left flex items-center gap-md px-md py-sm rounded-lg text-on-surface-variant hover:bg-surface-container-high transition-colors border-none bg-transparent" type="button" onClick={handleLogout}>
-            <span className="material-symbols-outlined text-error">logout</span>
-            <span className="text-label-lg text-error">Logout</span>
-          </button>
+
+        <div className="px-md mt-auto pt-lg border-t border-outline-variant/30 space-y-xs">
+          <ChefLogoutButton />
         </div>
       </aside>
 
       {/* Main Content Canvas */}
-      <main className="md:ml-64 min-h-screen flex-1 flex flex-col">
+      <main className="md:ml-64 min-h-screen flex flex-col flex-grow">
         
-        {/* Top Navigation Header */}
-        <header className="flex justify-between items-center px-lg sticky top-0 z-40 bg-surface/80 backdrop-blur-md shadow-sm h-16 w-full border-b border-outline-variant/30 shrink-0">
+        {/* Top Header */}
+        <header className="flex justify-between items-center px-lg sticky top-0 z-40 bg-surface/80 backdrop-blur-md shadow-sm h-16 w-full border-b border-outline-variant/30">
           <div className="flex items-center gap-md">
             <span className="md:hidden material-symbols-outlined text-primary cursor-pointer">menu</span>
           </div>
+          
           <div className="flex items-center gap-lg">
             <div className="hidden sm:flex gap-md">
               <span className="text-on-surface-variant text-label-lg hover:text-primary cursor-pointer" onClick={() => navigate("/chef/dashboard")}>Dashboard</span>
-              <span className="text-primary font-bold border-b-2 border-primary pb-1 text-label-lg cursor-default">Orders</span>
+              <span className="text-primary font-bold border-b-2 border-primary pb-1 text-label-lg cursor-pointer">Orders</span>
               <span className="text-on-surface-variant text-label-lg hover:text-primary cursor-pointer">Inventory</span>
             </div>
+            
             <div className="flex items-center gap-md">
-              <span className="material-symbols-outlined text-on-surface-variant cursor-pointer">notifications</span>
-              <span className="material-symbols-outlined text-on-surface-variant cursor-pointer">settings</span>
+              <ChefNotificationCentre />
               <div className="w-8 h-8 rounded-full overflow-hidden bg-surface-variant">
-                <img alt="Chef Portrait" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0Mvt-Egr9Z5x2DULCN_4DGrxry3kmsV1_pv9IkMpaxqW0LRol3nPndNED_EM7sDRATQc-R3axIN6WQBkxhRTepkukDfyNVaoKaT7pg72C-W1kl3Iry7r_9yyRH-iwWNq7X2H3v4uowEKU-J46RXmrp1djJJYLEJ5E8tJt-TCexHp4tRTOb_66hXkuFYlc_mL1sB_VFHC5BnbiS5MLCXU6RQLdHvzK7Ms1K5HCb5OLpJaOzEtSZvaB5LA84rd24gu2m6P634mqUw" />
+                <img alt="Chef Portrait" className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD0bxqxPZqyUHFKewPSzeVOhfZXM3wXTgeSuLRw-0oLynRHVEQ8XJbqmsp9aoThMiSFHWh1oDNYZs5s4Z6JKJVWpQTM8-HJ-h8gPioe7J9CwlkOt-Wt49Hab9DM509qMDq1ewjPsB07P23-boU3YxQRqY9vgWGP9aO4Q6Vn6Pu0e7t7LXm1QuJWGB-ngAWa1o4JsH6EreasRm8lWu_i1LbKffz3QQdAoYIqWRR1Y9Q1LMHCYJdrKTPPvmDndU2wpyvwJnpE3FbyBQ" />
               </div>
             </div>
           </div>
         </header>
 
         {/* Content Area */}
-        <div className="p-lg md:p-xl space-y-xl max-w-7xl mx-auto w-full flex-1 flex flex-col">
+        <div className="p-lg md:p-xl space-y-xl max-w-7xl mx-auto w-full">
           
-          {/* Title Banner & Stats */}
-          <section className="flex flex-col md:flex-row justify-between items-start md:items-end gap-md shrink-0">
+          {/* Headline & Stats Section */}
+          <section className="flex flex-col md:flex-row justify-between items-start md:items-end gap-md">
             <div>
-              <h2 className="text-headline-lg text-primary font-bold">Ready to Collect</h2>
+              <h2 className="text-headline-lg text-primary">Ready to Collect</h2>
               <p className="text-body-lg text-on-surface-variant">Manage order collections and QR scans for Stratizen students.</p>
             </div>
             <div className="flex gap-sm">
-              <div className="bg-secondary-container text-on-secondary-container px-md py-sm rounded-lg shadow-sm">
+              <div className="bg-secondary-container text-on-secondary-container px-md py-sm rounded-lg">
                 <div className="text-label-md">Active Pickups</div>
-                <div className="text-title-lg font-bold">{orders.length}</div>
+                <div className="text-title-lg font-bold">{activeCount}</div>
               </div>
-              <div className="bg-surface-container-high text-on-surface px-md py-sm rounded-lg shadow-sm">
+              <div className="bg-surface-container-high text-on-surface px-md py-sm rounded-lg">
                 <div className="text-label-md">Avg. Wait Time</div>
-                <div className="text-title-lg font-bold">2m 45s</div>
+                <div className="text-title-lg font-bold">{getAvgWaitTime()}</div>
               </div>
             </div>
           </section>
 
-          {/* Grid Layout for Queue and Quick Collect */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-lg flex-1">
+          {/* Bento Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-lg">
             
-            {/* Queue List (Left 8 columns) */}
-            <div className="lg:col-span-8 flex flex-col">
+            {/* Left Column: Queue List */}
+            <div className="lg:col-span-8">
+              
               <div className="flex justify-between items-center mb-md">
-                <h3 className="text-title-lg text-primary flex items-center gap-sm font-bold">
+                <h3 className="text-title-lg text-primary flex items-center gap-sm">
                   <span className="material-symbols-outlined">list_alt</span>
                   Queue
                 </h3>
-                <div className="flex items-center gap-sm border border-outline-variant rounded-full px-sm py-xs bg-surface shadow-sm">
+                <div className="flex items-center gap-sm border border-outline-variant rounded-full px-sm py-xs bg-surface">
                   <span className="material-symbols-outlined text-outline text-body-md">search</span>
                   <input 
                     className="bg-transparent border-none focus:ring-0 text-label-md py-0 outline-none" 
-                    placeholder="Search order # or student..." 
+                    placeholder="Search order #" 
                     type="text"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -328,38 +294,40 @@ function ReadyForPickup() {
               </div>
 
               {loading ? (
-                <div className="flex items-center justify-center min-h-[200px]">
+                <div className="flex items-center justify-center min-h-[250px]">
                   <span className="animate-spin material-symbols-outlined text-4xl text-primary">sync</span>
                 </div>
               ) : filteredOrders.length === 0 ? (
-                <div className="flex flex-col items-center justify-center p-xl bg-surface rounded-xl border border-dashed border-outline-variant text-on-surface-variant gap-sm min-h-[300px]">
-                  <span className="material-symbols-outlined text-5xl text-secondary">check_circle</span>
+                <div className="flex flex-col items-center justify-center p-xl bg-surface-container-lowest rounded-xl border border-dashed border-outline-variant text-on-surface-variant gap-sm min-h-[250px]">
+                  <span className="material-symbols-outlined text-5xl text-secondary">done_all</span>
                   <p className="font-title-lg text-on-surface">No Orders Awaiting Pickup</p>
-                  <p className="text-body-md text-center max-w-sm">Completed orders will appear here for collection. Students will be notified to scan their QR codes.</p>
+                  <p className="text-body-md text-center max-w-sm">All prepared meals have been collected by students. Great job!</p>
                 </div>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-md" id="order-grid">
-                  {filteredOrders.map(order => {
-                    const elapsedMs = currentTime - new Date(order.readyAt).getTime();
-                    
+                  {filteredOrders.map((order) => {
+                    const waitingMs = currentTime - new Date(order.readyAt).getTime();
+                    const totalQty = order.itemsList.reduce((sum, i) => sum + i.quantity, 0);
                     return (
                       <div key={order.id} className="bg-surface border border-outline-variant rounded-xl p-md flex flex-col justify-between shadow-sm order-card-transition">
                         <div className="flex justify-between items-start mb-sm">
                           <div>
-                            <span className="text-label-md text-primary bg-primary-fixed px-sm py-xs rounded uppercase tracking-wider font-bold">
-                              #{order.id.toString().startsWith("STR") ? order.id : `STR-${order.id}`}
+                            <span className="text-label-md text-primary bg-primary-fixed px-sm py-xs rounded uppercase tracking-wider">
+                              #STR-{order.id.substring(0, 4).toUpperCase()}
                             </span>
-                            <h4 className="text-body-lg font-bold mt-sm text-on-surface">{order.name}</h4>
-                            <p className="text-label-md text-on-surface-variant">{order.itemsList.length} {order.itemsList.length === 1 ? "item" : "items"} • {formatReadyElapsed(elapsedMs)}</p>
+                            <h4 className="text-body-lg font-bold mt-sm">{order.name}</h4>
+                            <p className="text-label-md text-on-surface-variant">
+                              {totalQty} item{totalQty !== 1 ? 's' : ''} • {formatReadyElapsed(waitingMs)}
+                            </p>
                           </div>
-                          <div className="bg-secondary-container text-on-secondary-container w-10 h-10 rounded-full flex items-center justify-center">
+                          <div className="bg-secondary-container text-on-secondary-container w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0">
                             <span className="material-symbols-outlined">check_circle</span>
                           </div>
                         </div>
-                        
-                        <div className="space-y-xs mb-md text-label-md text-on-surface-variant border-t border-b border-outline-variant/20 py-sm">
-                          {order.itemsList.map((item, index) => (
-                            <div key={index} className="flex justify-between">
+
+                        <div className="space-y-xs mb-md text-label-md text-on-surface-variant py-sm border-t border-b border-outline-variant/10">
+                          {order.itemsList.map((item, idx) => (
+                            <div key={idx} className="flex justify-between">
                               <span>{item.name}</span>
                               <span>x{item.quantity}</span>
                             </div>
@@ -367,15 +335,15 @@ function ReadyForPickup() {
                         </div>
 
                         <button 
-                          className={`w-full bg-secondary text-on-secondary text-label-lg py-sm rounded-lg hover:opacity-90 active:scale-[0.98] transition-all border-none cursor-pointer flex items-center justify-center gap-sm ${processingCollected[order.id] ? "opacity-70 cursor-not-allowed" : ""}`}
-                          type="button"
-                          onClick={() => handleMarkCollected(order.id)}
+                          className={`w-full bg-secondary text-on-secondary text-label-lg py-sm rounded-lg hover:opacity-90 active:scale-[0.98] transition-all mark-collected border-none cursor-pointer flex items-center justify-center gap-sm ${processingCollected[order.id] ? "opacity-70 cursor-not-allowed" : ""}`}
                           disabled={processingCollected[order.id]}
+                          onClick={() => handleMarkCollected(order.id)}
+                          type="button"
                         >
                           {processingCollected[order.id] ? (
                             <>
                               <span className="material-symbols-outlined animate-spin text-sm">sync</span>
-                              Collecting...
+                              Processing...
                             </>
                           ) : (
                             "Mark Collected"
@@ -388,61 +356,106 @@ function ReadyForPickup() {
               )}
             </div>
 
-            {/* Quick Collect Section (Right 4 columns) */}
+            {/* Right Column: Quick Collect Scan Sidebar */}
             <div className="lg:col-span-4">
               <div className="bg-primary text-on-primary rounded-2xl p-lg flex flex-col items-center text-center shadow-lg sticky top-24">
+                
                 <div className="mb-lg">
-                  <span className="material-symbols-outlined text-[64px] mb-md block text-primary-fixed">qr_code_scanner</span>
+                  <span className="material-symbols-outlined text-[64px] mb-md block">qr_code_scanner</span>
                   <h3 className="text-headline-lg-mobile font-bold">Quick Collect</h3>
                   <p className="text-body-md text-primary-fixed opacity-90 mt-xs">Scan student QR code to instantly mark order as collected</p>
                 </div>
-                
-                {/* QR Scanner Area */}
+
                 <div 
                   className="w-full aspect-square bg-white/10 rounded-xl border-2 border-dashed border-primary-fixed-dim flex flex-col items-center justify-center relative overflow-hidden group cursor-pointer" 
                   id="scan-trigger"
-                  onClick={handleQuickScan}
+                  onClick={handleQuickCollectScan}
                 >
                   <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                   <div className="absolute top-4 left-4 w-8 h-8 border-t-4 border-l-4 border-primary-fixed-dim"></div>
                   <div className="absolute top-4 right-4 w-8 h-8 border-t-4 border-r-4 border-primary-fixed-dim"></div>
                   <div className="absolute bottom-4 left-4 w-8 h-8 border-b-4 border-l-4 border-primary-fixed-dim"></div>
                   <div className="absolute bottom-4 right-4 w-8 h-8 border-b-4 border-r-4 border-primary-fixed-dim"></div>
-                  
-                  {/* Glowing Laser Scan Line */}
                   <div className="absolute top-0 left-0 w-full h-1 bg-secondary shadow-[0_0_15px_rgba(27,109,36,0.8)] animate-[scan_3s_ease-in-out_infinite] z-10"></div>
-                  
                   <span className="material-symbols-outlined text-surface text-[48px] animate-pulse">photo_camera</span>
-                  <span className="text-label-lg mt-sm text-primary-fixed">Awaiting Scan...</span>
+                  <span className="text-label-lg mt-sm">Awaiting Scan...</span>
                 </div>
-                
+
                 <div className="mt-lg w-full flex flex-col gap-sm">
-                  <button className="w-full bg-surface text-primary font-bold py-md rounded-xl hover:bg-surface-container-high transition-colors border-none cursor-pointer" type="button">Manual ID Entry</button>
+                  {showManualInput ? (
+                    <form onSubmit={handleManualCollect} className="w-full flex flex-col gap-xs">
+                      <input 
+                        type="text" 
+                        placeholder="Enter Order ID (e.g. STR-A1B2)" 
+                        className="w-full px-md py-sm rounded-lg text-on-surface bg-surface border-none text-body-md placeholder:text-on-surface-variant/40 outline-none"
+                        value={manualIdInput}
+                        onChange={(e) => setManualIdInput(e.target.value)}
+                        autoFocus
+                      />
+                      <div className="flex gap-sm">
+                        <button 
+                          type="submit" 
+                          className="flex-1 py-xs rounded bg-secondary text-on-secondary font-bold text-xs cursor-pointer border-none"
+                        >
+                          Submit
+                        </button>
+                        <button 
+                          type="button" 
+                          className="px-sm py-xs rounded bg-surface-variant text-on-surface font-bold text-xs cursor-pointer border-none"
+                          onClick={() => { setShowManualInput(false); setManualIdInput(""); }}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
+                    <button 
+                      className="w-full bg-surface text-primary font-bold py-md rounded-xl hover:bg-surface-container-high transition-colors cursor-pointer border-none"
+                      onClick={() => setShowManualInput(true)}
+                    >
+                      Manual ID Entry
+                    </button>
+                  )}
                   <p className="text-label-md text-primary-fixed-dim opacity-70">Trouble scanning? Ensure camera lens is clean.</p>
                 </div>
+
               </div>
             </div>
 
           </div>
+
         </div>
       </main>
 
-      {/* QR Scan Success Modal Overlay */}
+      {/* QR Code Scanner Simulation Modal */}
       {scanModal && (
-        <div className="scan-modal-overlay fixed inset-0 z-[60] bg-primary flex items-center justify-center">
-          <div className="text-center text-on-primary p-lg max-w-sm flex flex-col items-center">
-            <span className="material-symbols-outlined text-[96px] text-secondary-container mb-md animate-bounce">check_circle</span>
-            <h2 className="text-headline-lg font-bold">SCAN SUCCESSFUL</h2>
-            <p className="text-title-lg mt-xs">Order #{scanModal.orderId.toString().startsWith("STR") ? scanModal.orderId : `STR-${scanModal.orderId}`} Verified</p>
-            <p className="mt-md text-body-lg opacity-90">Student: {scanModal.studentName}</p>
-            <button 
-              id="close-scan" 
-              className="mt-xl px-xl py-sm bg-surface text-primary rounded-full font-bold border-none cursor-pointer hover:bg-surface-container-high transition-colors active:scale-95"
-              type="button"
-              onClick={handleDismissScan}
-            >
-              DISMISS
-            </button>
+        <div 
+          className="fixed inset-0 z-[60] bg-primary flex items-center justify-center p-md"
+          onClick={() => setScanModal(null)}
+        >
+          <div 
+            className="bg-surface text-on-surface rounded-2xl p-lg max-w-[450px] w-full text-center shadow-2xl relative border border-outline-variant/30"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span className="material-symbols-outlined text-secondary text-[72px] mb-md animate-bounce block">check_circle</span>
+            <h2 className="text-headline-lg font-bold text-primary mb-xs">SCAN SUCCESSFUL</h2>
+            <p className="text-title-lg font-bold">Order #STR-{scanModal.orderId.substring(0, 4).toUpperCase()} Verified</p>
+            <p className="text-body-lg text-on-surface-variant mt-sm">Student: <strong>{scanModal.studentName}</strong></p>
+            
+            <div className="mt-xl flex flex-col gap-sm">
+              <button 
+                className="w-full bg-secondary text-on-secondary py-md rounded-xl font-bold hover:opacity-90 active:scale-[0.98] transition-all border-none cursor-pointer"
+                onClick={() => handleMarkCollected(scanModal.orderId)}
+              >
+                Confirm Collection
+              </button>
+              <button 
+                className="w-full bg-surface-container-highest text-on-surface-variant py-md rounded-xl font-bold hover:bg-surface-container-high transition-colors border-none cursor-pointer"
+                onClick={() => setScanModal(null)}
+              >
+                Dismiss
+              </button>
+            </div>
           </div>
         </div>
       )}

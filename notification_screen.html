@@ -1,0 +1,212 @@
+<!DOCTYPE html><html class="light" lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Chef Notifications - CampusChef Admin</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet">
+<style>
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; }
+        .fill-icon { font-variation-settings: 'FILL' 1; }
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .animate-slide-in { animation: slideIn 0.3s ease-out forwards; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#001e40",
+                        "primary-container": "#003366",
+                        "on-primary": "#ffffff",
+                        "on-primary-container": "#799dd6",
+                        "background": "#fcf9f8",
+                        "surface": "#fcf9f8",
+                        "surface-container-low": "#f6f3f2",
+                        "surface-container-high": "#eae7e7",
+                        "surface-container-highest": "#e5e2e1",
+                        "on-surface": "#1c1b1b",
+                        "on-surface-variant": "#43474f",
+                        "outline": "#737780",
+                        "outline-variant": "#c3c6d1",
+                        "error": "#ba1a1a",
+                        "error-container": "#ffdad6",
+                        "on-error-container": "#93000a",
+                        "secondary-container": "#a0f399",
+                        "on-secondary-container": "#217128"
+                    },
+                    borderRadius: { "DEFAULT": "0.25rem", "lg": "0.5rem", "xl": "0.75rem", "full": "9999px" },
+                    spacing: { "xs": "4px", "sm": "8px", "md": "16px", "lg": "24px", "xl": "32px" },
+                    fontFamily: { sans: ["Inter", "sans-serif"] },
+                    fontSize: {
+                        "label-md": ["12px", {"lineHeight": "16px", "fontWeight": "500"}],
+                        "label-lg": ["14px", {"lineHeight": "20px", "letterSpacing": "0.1px", "fontWeight": "500"}],
+                        "body-md": ["14px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "body-lg": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                        "title-lg": ["22px", {"lineHeight": "28px", "fontWeight": "500"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                        "headline-lg-mobile": ["28px", {"lineHeight": "36px", "fontWeight": "600"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-background text-on-background min-h-screen flex font-sans">
+<!-- Sidebar -->
+<aside class="hidden md:flex flex-col w-64 fixed inset-y-0 left-0 bg-surface-container-low border-r border-outline-variant z-50">
+<div class="p-lg mb-xl flex items-center gap-sm">
+<div class="w-10 h-10 rounded-lg bg-primary flex items-center justify-center text-on-primary" style="background-color: rgb(0, 51, 102);"><span class="material-symbols-outlined">restaurant</span></div>
+<div>
+<h1 class="text-primary text-headline-lg font-bold leading-none">Stratizen</h1>
+<p class="text-on-surface-variant text-label-md">Dining Portal</p>
+</div>
+</div>
+<nav class="flex-1 px-sm space-y-1">
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="text-label-lg">Kitchen Dashboard</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="text-label-lg">Order Queue</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">restaurant_menu</span>
+<span class="text-label-lg">Menu Manager</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">bar_chart</span>
+<span class="text-label-lg">Analytics</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">groups</span>
+<span class="text-label-lg">Staff Settings</span>
+</a>
+</nav>
+<div class="p-sm space-y-1 mt-auto">
+<button class="w-full flex items-center justify-center gap-sm bg-primary text-on-primary rounded-lg py-sm mb-lg text-label-lg hover:opacity-90">
+<span class="material-symbols-outlined text-[20px]">swap_horiz</span>
+                Switch to Student View
+            </button>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">help</span>
+<span class="text-label-lg">Help Center</span>
+</a>
+<a class="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high rounded-lg transition-colors" href="#">
+<span class="material-symbols-outlined">logout</span>
+<span class="text-label-lg">Logout</span>
+</a>
+</div>
+</aside>
+<!-- Main Content -->
+<main class="flex-1 md:ml-64 flex flex-col min-h-screen bg-white">
+<!-- Header -->
+<header class="sticky top-0 z-40 bg-white/80 backdrop-blur-md border-b border-outline-variant h-16 px-lg flex items-center justify-between">
+<div class="flex items-center gap-md">
+<span class="md:hidden material-symbols-outlined cursor-pointer">menu</span>
+<h2 class="text-primary text-headline-lg font-bold hidden md:block">CampusChef Admin</h2>
+<h2 class="text-primary text-headline-lg-mobile font-bold md:hidden">Admin</h2>
+</div>
+<div class="flex-1 max-w-xl px-lg hidden md:block">
+<div class="relative">
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-outline">search</span>
+<input class="w-full bg-surface-container-highest border-none rounded-full py-2 pl-10 pr-4 text-body-md focus:ring-2 focus:ring-primary" placeholder="Search orders or alerts..." type="text">
+</div>
+</div>
+<div class="flex items-center gap-md">
+<div class="relative cursor-pointer">
+<span class="material-symbols-outlined text-primary">notifications</span>
+<span class="absolute top-0 right-0 w-2.5 h-2.5 bg-error rounded-full border-2 border-white"></span>
+</div>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer">settings</span>
+<img alt="Chef Portrait" class="w-8 h-8 rounded-full border border-outline-variant object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDYuD6Jk-rWRTg_BG3esW4VbRy5DREMi6Nmjz3_RAuAsPW7-8I-ErQFKGsOEHaMsAeaYeORr7JtKfKSeXYkOuIaq-1izf3hJ6M1zQvRTCzmOa0Mg18k0_d2qJi2Cbjn6WhWeH1Lh96WH67JfFXcj6pSNLcmvGwCMc5raZyeGeOz8HncBV9ubFFUfs_Nwc_d4GcIYOUYgRHJOusdulQfOdLdhfwD7sTJ283t94ri14uu5eiiWQq46W4akZfNeKzDXYVdEJajtKOnZg">
+</div>
+</header>
+<!-- Notification List -->
+<div class="p-md md:p-lg overflow-y-auto">
+<div class="max-w-4xl mx-auto">
+<div class="flex flex-col md:flex-row md:items-center justify-between mb-lg gap-md">
+<div>
+<h1 class="text-headline-lg text-primary font-bold">Notification Centre</h1>
+<p class="text-on-surface-variant text-body-md">Manage your daily kitchen and system notifications</p>
+</div>
+<button class="flex items-center gap-sm px-md py-sm rounded-lg border border-outline text-primary text-label-lg hover:bg-primary/5 transition-colors" onclick="markAllAsRead(event)">
+<span class="material-symbols-outlined text-[18px]">done_all</span>
+                        Mark all as read
+                    </button>
+</div>
+<div class="grid grid-cols-1 md:grid-cols-12 gap-md gap-y-lg" id="notification-container"><div class="md:col-span-12 bg-primary-container/10 border-l-4 border-primary rounded-xl p-md flex gap-md animate-slide-in group cursor-pointer"><div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary flex-shrink-0"><span class="material-symbols-outlined">shopping_cart</span></div><div class="flex-1"><div class="flex justify-between"><h3 class="text-title-lg text-primary font-bold">New Order Received</h3><span class="text-label-md text-outline">Just now</span></div><p class="text-body-md text-on-surface mb-sm">Order <span class="font-bold">#STZ-98422</span>: 1x Swahili Pilau, 2x Mango Juice.</p><div class="flex gap-sm"><button class="bg-primary text-on-primary px-md py-xs rounded-lg text-label-md">Start Preparing</button></div></div><span class="material-symbols-outlined text-outline group-hover:opacity-100 opacity-0 transition-opacity">close</span></div><div class="md:col-span-12 bg-primary-container/10 border-l-4 border-primary rounded-xl p-md flex gap-md animate-slide-in group cursor-pointer"><div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary flex-shrink-0"><span class="material-symbols-outlined">shopping_cart</span></div><div class="flex-1"><div class="flex justify-between"><h3 class="text-title-lg text-primary font-bold">New Order Received</h3><span class="text-label-md text-outline">1 min ago</span></div><p class="text-body-md text-on-surface mb-sm">Order <span class="font-bold">#STZ-98423</span>: 2x Beef Stew, 1x Chapati.</p><div class="flex gap-sm"><button class="bg-primary text-on-primary px-md py-xs rounded-lg text-label-md">Start Preparing</button></div></div><span class="material-symbols-outlined text-outline group-hover:opacity-100 opacity-0 transition-opacity">close</span></div><div class="md:col-span-12 bg-primary-container/10 border-l-4 border-primary rounded-xl p-md flex gap-md animate-slide-in group cursor-pointer"><div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary flex-shrink-0"><span class="material-symbols-outlined">shopping_cart</span></div><div class="flex-1"><div class="flex justify-between"><h3 class="text-title-lg text-primary font-bold">New Order Received</h3><span class="text-label-md text-outline">1 min ago</span></div><p class="text-body-md text-on-surface mb-sm">Order <span class="font-bold">#STZ-98424</span>: 1x Grilled Tilapia, 1x Ugali.</p><div class="flex gap-sm"><button class="bg-primary text-on-primary px-md py-xs rounded-lg text-label-md">Start Preparing</button></div></div><span class="material-symbols-outlined text-outline group-hover:opacity-100 opacity-0 transition-opacity">close</span></div>
+<!-- High Priority -->
+<div class="md:col-span-12 bg-primary-container/10 border-l-4 border-primary rounded-xl p-md flex gap-md animate-slide-in group cursor-pointer">
+<div class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary flex-shrink-0">
+<span class="material-symbols-outlined">shopping_cart</span>
+</div>
+<div class="flex-1">
+<div class="flex justify-between">
+<h3 class="text-title-lg text-primary font-bold">New Order Received</h3>
+<span class="text-label-md text-outline">2 mins ago</span>
+</div>
+<p class="text-body-md text-on-surface mb-sm">Order #8492 for <span class="font-bold">Stratizen Hall B</span> (12 items) requires immediate preparation.</p>
+<div class="flex gap-sm">
+<button class="bg-primary text-on-primary px-md py-xs rounded-lg text-label-md">Start Preparing</button>
+
+</div>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:opacity-100 opacity-0 transition-opacity">close</span>
+</div>
+<!-- Medium Priority -->
+
+<!-- System Alert -->
+
+<!-- List Notifications -->
+<div class="md:col-span-12 space-y-lg">
+<div class="bg-white rounded-xl border border-outline-variant p-md flex items-center gap-md hover:bg-surface-container-low transition-colors cursor-pointer group">
+<div class="w-10 h-10 rounded-full bg-surface-container-highest flex items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined">person</span>
+</div>
+<div class="flex-1">
+<p class="text-body-md text-on-surface"><span class="font-bold">Chef Marco</span> joined the morning shift.</p>
+<p class="text-label-md text-outline">3 hours ago • Staffing</p>
+</div>
+<span class="material-symbols-outlined text-outline group-hover:text-primary group-hover:translate-x-1 opacity-0 group-hover:opacity-100 transition-all">chevron_right</span>
+</div>
+
+</div>
+</div>
+
+</div>
+</div>
+</main>
+<script>
+        function markAllAsRead(event) {
+            const container = document.getElementById('notification-container');
+            const cards = container.children;
+            
+            Array.from(cards).forEach((card, index) => {
+                setTimeout(() => {
+                    card.classList.add('opacity-70');
+                    card.classList.remove('border-primary', 'bg-primary-container/10');
+                    card.classList.add('bg-white');
+                }, index * 50);
+            });
+            
+            const btn = event.currentTarget;
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<span class="material-symbols-outlined text-[18px]">check</span> Done';
+            btn.classList.add('bg-secondary-container', 'text-on-secondary-container');
+            
+            setTimeout(() => {
+                btn.innerHTML = originalContent;
+                btn.classList.remove('bg-secondary-container', 'text-on-secondary-container');
+            }, 2000);
+        }
+    </script>
+
+
+
+
+</body></html>

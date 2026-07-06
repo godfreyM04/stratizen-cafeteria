@@ -2,6 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useTray } from "../context/TrayContext";
 import { useToast } from "../context/ToastContext";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 import "../styles/Checkout.css";
 
 const formatKES = (price) => {
@@ -32,7 +34,6 @@ const CelebrationCanvas = () => {
         this.size = Math.random() * 8 + 6;
         this.speedX = Math.random() * 4 - 2;
         this.speedY = Math.random() * 4 + 4;
-        // Theme colors: deep navy, green, teal, orange, gold, pink (dynamic for dark mode)
         const isDark = document.documentElement.classList.contains("dark");
         const colors = isDark 
           ? ["#4f8eff", "#3ad06c", "#61c3f2", "#ff8c00", "#ffd54f", "#e91e63"]
@@ -87,7 +88,7 @@ const CelebrationCanvas = () => {
       draw() {
         ctx.save();
         ctx.globalAlpha = this.alpha;
-        ctx.fillStyle = "#ffb77d"; // Gold star color
+        ctx.fillStyle = "#ffb77d";
         ctx.beginPath();
         
         const cx = this.x;
@@ -161,134 +162,184 @@ const CelebrationCanvas = () => {
 
 function Checkout() {
   const navigate = useNavigate();
+  const { user, profile } = useAuth();
   const { trayItems, subtotal, tax, total, clearTray } = useTray();
   const { addToast } = useToast();
 
   const [pickupLocation, setPickupLocation] = useState("counter_a");
   const [paymentMethod, setPaymentMethod] = useState("wallet");
-
-  const [walletBalance, setWalletBalance] = useState(() => {
-    const cached = localStorage.getItem("stratizen_wallet_balance");
-    return cached ? parseFloat(cached) : 4550.00;
-  });
+  const [walletBalance, setWalletBalance] = useState(0);
 
   const [showInsufficientBalanceModal, setShowInsufficientBalanceModal] = useState(false);
+  const [showActiveOrderErrorModal, setShowActiveOrderErrorModal] = useState(false);
   const [showSuccessOverlay, setShowSuccessOverlay] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const handlePlaceOrder = () => {
+  useEffect(() => {
+    if (!user) return;
+    const fetchWallet = async () => {
+      const { data, error } = await supabase
+        .from("wallets")
+        .select("balance")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (data) {
+        setWalletBalance(parseFloat(data.balance));
+      }
+    };
+    fetchWallet();
+  }, [user]);
+
+  const handlePlaceOrder = async () => {
     if (trayItems.length === 0) {
       alert("Your tray is empty! Add items from the menu first.");
       navigate("/menu");
       return;
     }
 
-    const orderId = "STR-" + Math.floor(1000 + Math.random() * 9000);
-    const placedDate = new Date();
-    const estMinutes = pickupLocation === "counter_a" ? 15 : 10;
-    
-    // Calculate estimated collection time
-    const estDate = new Date(placedDate.getTime() + estMinutes * 60000);
-    let estHours = estDate.getHours();
-    const estMins = estDate.getMinutes().toString().padStart(2, "0");
-    const estAmpm = estHours >= 12 ? "PM" : "AM";
-    estHours = estHours % 12;
-    estHours = estHours ? estHours : 12;
-    const estimatedTime = `${estHours}:${estMins} ${estAmpm}`;
+    setLoading(true);
 
-    // Format placed date & time (e.g. Oct 24, 2024 at 11:42 AM)
-    const options = { month: "short", day: "numeric", year: "numeric" };
-    const dateStr = placedDate.toLocaleDateString("en-US", options);
-    let placedHours = placedDate.getHours();
-    const placedMins = placedDate.getMinutes().toString().padStart(2, "0");
-    const placedAmpm = placedHours >= 12 ? "PM" : "AM";
-    placedHours = placedHours % 12;
-    placedHours = placedHours ? placedHours : 12;
-    const placedFormatted = `${dateStr} at ${placedHours}:${placedMins} ${placedAmpm}`;
+    const isUuid = (val) => 
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
-    const activeOrder = {
-      id: orderId,
-      placedAt: placedDate.toISOString(),
-      placedFormatted: placedFormatted,
-      estimatedTime: estimatedTime,
-      pickupLocation: pickupLocation === "counter_a" ? "Pickup Counter A" : "Pickup Counter B",
-      paymentMethod: paymentMethod === "wallet" ? "University Wallet" : "Mobile Money",
-      items: [...trayItems],
-      subtotal: subtotal,
-      tax: tax,
-      total: total,
-      status: "received" // Initial status
-    };
-
-    if (paymentMethod === "wallet") {
-      if (walletBalance < total) {
-        setShowInsufficientBalanceModal(true);
+    try {
+      // 0. Validate user.id and menu item IDs
+      if (!user?.id || !isUuid(user.id)) {
+        console.error("[Checkout] Order placement aborted: invalid user.id (not a UUID):", user?.id);
+        alert("Failed to place order: Invalid user authentication session. Please try logging in again.");
+        setLoading(false);
         return;
       }
 
-      // Deduct balance
-      const nextBalance = walletBalance - total;
-      setWalletBalance(nextBalance);
-      localStorage.setItem("stratizen_wallet_balance", nextBalance.toFixed(2));
-
-      // Append transaction
-      const transactionsJson = localStorage.getItem("stratizen_wallet_transactions");
-      let transactions = [];
-      if (transactionsJson) {
-        try {
-          transactions = JSON.parse(transactionsJson);
-        } catch (e) {
-          console.error(e);
-        }
+      const invalidItems = trayItems.filter(item => !isUuid(item.id));
+      if (invalidItems.length > 0) {
+        console.error("[Checkout] Order placement aborted: tray contains invalid menu item IDs (not UUIDs):", invalidItems);
+        alert("Failed to place order: Your tray contains items with out-of-date identifiers. Please clear your tray and re-add them from the menu.");
+        setLoading(false);
+        return;
       }
-      
-      const newTx = {
-        id: "tx-order-" + Date.now(),
-        type: "purchase",
-        title: "Main Dining Hall",
-        desc: `${activeOrder.pickupLocation} • ` + trayItems.map(i => `${i.quantity}x ${i.name}`).join(", ").substring(0, 30),
-        timestamp: placedDate.toISOString(),
-        amount: total
+
+      // 1. Check if student already has an active order
+      const { data: activeOrder, error: checkError } = await supabase
+        .from("orders")
+        .select("id")
+        .eq("user_id", user.id)
+        .in("status", ["pending", "preparing", "ready"])
+        .limit(1)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      if (activeOrder) {
+        setShowActiveOrderErrorModal(true);
+        setLoading(false);
+        return;
+      }
+
+      // 2. Verify wallet balance if paying via wallet
+      if (paymentMethod === "wallet" && walletBalance < total) {
+        setShowInsufficientBalanceModal(true);
+        setLoading(false);
+        return;
+      }
+
+      // 3. Prepare order items JSON
+      const itemsJson = trayItems.map(item => ({
+        menu_item_id: item.id,
+        quantity: item.quantity,
+        unit_price: item.price,
+        subtotal: item.price * item.quantity
+      }));
+
+      // Log the payload details before calling Supabase
+      console.log("[Checkout] Order payload validated. Submitting place_order RPC with:", {
+        p_user_id: user.id,
+        p_student_name: profile?.full_name || "Student",
+        p_student_id: profile?.student_number || "",
+        p_pickup_option: pickupLocation === "counter_a" ? "dine_in" : "takeaway",
+        p_total_items: trayItems.reduce((sum, i) => sum + i.quantity, 0),
+        p_subtotal: subtotal,
+        p_total: total,
+        p_items: itemsJson
+      });
+
+      // 4. Call the atomic place_order RPC
+      const { data: newOrderId, error: rpcError } = await supabase.rpc("place_order", {
+        p_user_id: user.id,
+        p_student_name: profile?.full_name || "Student",
+        p_student_id: profile?.student_number || "",
+        p_pickup_option: pickupLocation === "counter_a" ? "dine_in" : "takeaway",
+        p_total_items: trayItems.reduce((sum, i) => sum + i.quantity, 0),
+        p_subtotal: subtotal,
+        p_total: total,
+        p_notes: "",
+        p_items: itemsJson
+      });
+
+      if (rpcError) {
+        console.error("[Checkout] place_order RPC execution failed:", {
+          code: rpcError.code,
+          message: rpcError.message,
+          details: rpcError.details
+        });
+
+        if (rpcError.message.includes("INSUFFICIENT_BALANCE")) {
+          setShowInsufficientBalanceModal(true);
+        } else if (rpcError.message.includes("ACTIVE_ORDER_EXISTS")) {
+          setShowActiveOrderErrorModal(true);
+        } else {
+          alert(`Failed to place your order: ${rpcError.message || rpcError.code}`);
+        }
+        setLoading(false);
+        return;
+      }
+
+      // 5. Build active order object for frontend state synchronization
+      const placedDate = new Date();
+      const estMinutes = pickupLocation === "counter_a" ? 15 : 10;
+      const estDate = new Date(placedDate.getTime() + estMinutes * 60000);
+      let estHours = estDate.getHours();
+      const estMins = estDate.getMinutes().toString().padStart(2, "0");
+      const estAmpm = estHours >= 12 ? "PM" : "AM";
+      estHours = estHours % 12;
+      estHours = estHours ? estHours : 12;
+      const estimatedTime = `${estHours}:${estMins} ${estAmpm}`;
+
+      const options = { month: "short", day: "numeric", year: "numeric" };
+      const dateStr = placedDate.toLocaleDateString("en-US", options);
+      let placedHours = placedDate.getHours();
+      const placedMins = placedDate.getMinutes().toString().padStart(2, "0");
+      const placedAmpm = placedHours >= 12 ? "PM" : "AM";
+      placedHours = placedHours % 12;
+      placedHours = placedHours ? placedHours : 12;
+      const placedFormatted = `${dateStr} at ${placedHours}:${placedMins} ${placedAmpm}`;
+
+      const activeOrderObj = {
+        id: newOrderId,
+        placedAt: placedDate.toISOString(),
+        placedFormatted: placedFormatted,
+        estimatedTime: estimatedTime,
+        pickupLocation: pickupLocation === "counter_a" ? "Pickup Counter A" : "Pickup Counter B",
+        paymentMethod: paymentMethod === "wallet" ? "University Wallet" : "Mobile Money",
+        items: [...trayItems],
+        subtotal: subtotal,
+        tax: tax,
+        total: total,
+        status: "pending"
       };
 
-      transactions.unshift(newTx);
-      localStorage.setItem("stratizen_wallet_transactions", JSON.stringify(transactions));
-      
+      // Save active order to localStorage for tracking/navigation sync
+      localStorage.setItem("stratizen_active_order", JSON.stringify(activeOrderObj));
+
       addToast(`Order placed successfully! KES ${formatKES(total)} paid via University Wallet.`);
-    } else if (paymentMethod === "mobile") {
-      alert("Redirecting to Mobile Money payment gateway...");
-      addToast("Order placed successfully via Mobile Money!");
+      clearTray();
+      setShowSuccessOverlay(true);
+    } catch (err) {
+      console.error("Checkout error:", err.message);
+      alert("Failed to place your order: " + err.message);
+    } finally {
+      setLoading(false);
     }
-
-    // Save order to history for Recent Orders
-    const historyJson = localStorage.getItem("stratizen_order_history");
-    let history = [];
-    if (historyJson) {
-      try {
-        history = JSON.parse(historyJson);
-      } catch (e) {
-        console.error(e);
-      }
-    }
-    history.unshift({
-      id: orderId,
-      placedAt: placedDate.toISOString(),
-      items: trayItems.map(item => ({
-        id: item.id,
-        name: item.name,
-        price: item.price,
-        image: item.image,
-        category: item.category,
-        description: item.description,
-        quantity: item.quantity
-      }))
-    });
-    localStorage.setItem("stratizen_order_history", JSON.stringify(history));
-
-    // Save active order to localStorage
-    localStorage.setItem("stratizen_active_order", JSON.stringify(activeOrder));
-
-    clearTray();
-    setShowSuccessOverlay(true);
   };
 
   return (
@@ -485,12 +536,12 @@ function Checkout() {
             </div>
 
             <button 
-              className="place-order-btn" 
-              disabled={trayItems.length === 0}
+              className="place-order-btn cursor-pointer border-none" 
+              disabled={trayItems.length === 0 || loading}
               onClick={handlePlaceOrder}
             >
               <span className="material-symbols-outlined place-order-btn-icon" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
-              Place Order
+              {loading ? "Processing..." : "Place Order"}
             </button>
             
             <p className="agreement-disclaimer">
@@ -530,20 +581,70 @@ function Checkout() {
             <div className="insufficient-modal-actions">
               <button 
                 type="button" 
-                className="insufficient-btn-cancel" 
+                className="insufficient-btn-cancel cursor-pointer border-none" 
                 onClick={() => setShowInsufficientBalanceModal(false)}
               >
                 Cancel
               </button>
               <button 
                 type="button" 
-                className="insufficient-btn-confirm" 
+                className="insufficient-btn-confirm cursor-pointer border-none" 
                 onClick={() => {
                   setShowInsufficientBalanceModal(false);
                   navigate("/wallet");
                 }}
               >
                 Top Up
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Active Order Limit Reached Modal */}
+      {showActiveOrderErrorModal && (
+        <div 
+          className="insufficient-modal-backdrop" 
+          role="dialog" 
+          aria-modal="true" 
+          onClick={() => setShowActiveOrderErrorModal(false)}
+        >
+          <div className="insufficient-modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "450px", textAlign: "center" }}>
+            <div className="insufficient-modal-icon-wrapper" style={{ backgroundColor: "var(--color-primary-container)", color: "var(--color-primary)" }}>
+              <span className="material-symbols-outlined insufficient-modal-icon" style={{ color: "var(--color-primary)" }}>warning</span>
+            </div>
+            <h3 className="insufficient-modal-header">Active Order In Progress</h3>
+            <div className="insufficient-modal-body">
+              <p className="insufficient-modal-message">
+                You currently have an active order being prepared in the kitchen.
+              </p>
+              <p className="insufficient-modal-message" style={{ fontWeight: "600", marginTop: "8px" }}>
+                To maintain food quality and prevent kitchen overload, students are limited to one active order at a time.
+              </p>
+              <p className="insufficient-modal-submessage">
+                Please wait until your current order is collected before placing a new one.
+              </p>
+            </div>
+            
+            <div className="insufficient-modal-actions" style={{ flexDirection: "column", gap: "12px" }}>
+              <button 
+                type="button" 
+                className="insufficient-btn-confirm cursor-pointer border-none" 
+                style={{ width: "100%", margin: 0 }}
+                onClick={() => {
+                  setShowActiveOrderErrorModal(false);
+                  navigate("/order-tracking");
+                }}
+              >
+                View Current Order
+              </button>
+              <button 
+                type="button" 
+                className="insufficient-btn-cancel cursor-pointer border-none" 
+                style={{ width: "100%", margin: 0, backgroundColor: "var(--color-surface-container-highest)" }}
+                onClick={() => setShowActiveOrderErrorModal(false)}
+              >
+                Close
               </button>
             </div>
           </div>
@@ -572,7 +673,7 @@ function Checkout() {
             </div>
             <button 
               type="button" 
-              className="success-overlay-cta"
+              className="success-overlay-cta cursor-pointer border-none"
               onClick={() => {
                 setShowSuccessOverlay(false);
                 navigate("/order-tracking");

@@ -1,5 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 import AuthLayout from "../components/AuthLayout";
 import "../styles/OrderTracking.css";
 
@@ -10,60 +12,135 @@ const formatKES = (price) => {
   });
 };
 
-const STATUS_STEPS = ["received", "confirmed", "preparing", "ready", "collected"];
+const formatTime = (isoString) => {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  if (isNaN(date.getTime())) return "";
+  
+  let hours = date.getHours();
+  const minutes = date.getMinutes().toString().padStart(2, "0");
+  const ampm = hours >= 12 ? "PM" : "AM";
+  hours = hours % 12;
+  hours = hours ? hours : 12;
+  return `${hours}:${minutes} ${ampm}`;
+};
+
+const getStepIndex = (status) => {
+  switch (status) {
+    case "pending": return 2; // Map pending immediately to "Food Being Prepared" (Step 3)
+    case "preparing": return 2;
+    case "ready": return 3;
+    case "collected": return 4;
+    default: return 0;
+  }
+};
 
 function OrderTracking() {
+  const { user } = useAuth();
   const navigate = useNavigate();
-  const [order, setOrder] = useState(() => {
-    try {
-      const stored = localStorage.getItem("stratizen_active_order");
-      return stored ? JSON.parse(stored) : null;
-    } catch (err) {
-      console.error("Failed to parse active order:", err);
-      return null;
-    }
-  });
+  const [order, setOrder] = useState(null);
+  const [loading, setLoading] = useState(true);
 
-  // Calculate dynamic status based on time elapsed
   useEffect(() => {
-    if (!order) return;
+    if (!user) return;
 
-    const checkStatus = () => {
-      // If manual simulation override is active, use it
-      if (order.simulatedStatus) {
-        if (order.status !== order.simulatedStatus) {
-          const updated = { ...order, status: order.simulatedStatus };
-          setOrder(updated);
-          localStorage.setItem("stratizen_active_order", JSON.stringify(updated));
+    const loadActiveOrder = async () => {
+      try {
+        // Fetch the most recent active order from Supabase
+        const { data: active, error: fetchError } = await supabase
+          .from("orders")
+          .select("*, order_items(*, menu(*))")
+          .eq("user_id", user.id)
+          .in("status", ["pending", "preparing", "ready"])
+          .order("created_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (fetchError) throw fetchError;
+
+        if (active) {
+          // Map DB items to UI format
+          const mappedItems = (active.order_items || []).map(oi => ({
+            id: oi.id,
+            name: oi.menu?.name || "Meal",
+            price: parseFloat(oi.unit_price),
+            quantity: oi.quantity,
+            category: oi.menu?.category || "Main"
+          }));
+
+          // Calculate estimated collection time (15 mins from creation)
+          const placedDate = new Date(active.created_at);
+          const estDate = new Date(placedDate.getTime() + 15 * 60000);
+          const estimatedTime = formatTime(estDate);
+
+          const orderObj = {
+            id: active.id,
+            placedAt: active.created_at,
+            placedFormatted: new Date(active.created_at).toLocaleString("en-US", {
+              month: "short",
+              day: "numeric",
+              year: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+              hour12: true
+            }),
+            estimatedTime,
+            pickupLocation: active.pickup_option === "dine_in" ? "Pickup Counter A" : "Pickup Counter B",
+            paymentMethod: active.wallet_deduction > 0 ? "University Wallet" : "Mobile Money",
+            items: mappedItems,
+            subtotal: parseFloat(active.subtotal),
+            tax: parseFloat(active.total) - parseFloat(active.subtotal),
+            total: parseFloat(active.total),
+            status: active.status,
+            prep_started_at: active.prep_started_at,
+            ready_at: active.ready_at,
+            collected_at: active.collected_at
+          };
+
+          setOrder(orderObj);
+          localStorage.setItem("stratizen_active_order", JSON.stringify(orderObj));
+        } else {
+          setOrder(null);
+          localStorage.removeItem("stratizen_active_order");
         }
-        return;
-      }
-
-      const elapsed = Date.now() - new Date(order.placedAt).getTime();
-      const elapsedSeconds = elapsed / 1000;
-
-      let currentStatus = "received";
-      if (elapsedSeconds >= 300) {
-        currentStatus = "collected";
-      } else if (elapsedSeconds >= 180) {
-        currentStatus = "ready";
-      } else if (elapsedSeconds >= 50) {
-        currentStatus = "preparing";
-      } else if (elapsedSeconds >= 20) {
-        currentStatus = "confirmed";
-      }
-
-      if (order.status !== currentStatus) {
-        const updated = { ...order, status: currentStatus };
-        setOrder(updated);
-        localStorage.setItem("stratizen_active_order", JSON.stringify(updated));
+      } catch (err) {
+        console.error("Failed to load active order:", err.message);
+      } finally {
+        setLoading(false);
       }
     };
 
-    checkStatus();
-    const interval = setInterval(checkStatus, 2000);
-    return () => clearInterval(interval);
-  }, [order]);
+    loadActiveOrder();
+
+    // Subscribe to changes on the orders table for this user
+    const orderSubscription = supabase
+      .channel(`active_order_tracking_${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          console.log("Order change detected in tracking:", payload);
+          // Reload the entire order to ensure all relations (items) are fetched correctly
+          loadActiveOrder();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      orderSubscription.unsubscribe();
+    };
+  }, [user]);
+
+  if (loading) {
+    return (
+      <AuthLayout>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-md">
+          <span className="material-symbols-outlined animate-spin text-[48px] text-primary">sync</span>
+          <p className="text-on-surface-variant font-medium">Retrieving active order status...</p>
+        </div>
+      </AuthLayout>
+    );
+  }
 
   if (!order) {
     return (
@@ -84,59 +161,7 @@ function OrderTracking() {
     );
   }
 
-  const currentStepIndex = STATUS_STEPS.indexOf(order.status);
-
-  // Helper to calculate step timestamps
-  const getStepTime = (baseTimeStr, offsetMinutes) => {
-    const base = new Date(baseTimeStr);
-    const stepTime = new Date(base.getTime() + offsetMinutes * 60000);
-    let hours = stepTime.getHours();
-    const minutes = stepTime.getMinutes().toString().padStart(2, "0");
-    const ampm = hours >= 12 ? "PM" : "AM";
-    hours = hours % 12;
-    hours = hours ? hours : 12;
-    return `${hours}:${minutes} ${ampm}`;
-  };
-
-  // Simulating state overrides
-  const setSimulatedStatus = (status) => {
-    const updated = { ...order, simulatedStatus: status, status: status };
-    setOrder(updated);
-    localStorage.setItem("stratizen_active_order", JSON.stringify(updated));
-  };
-
-  const resetOrderTimer = () => {
-    const placedDate = new Date();
-    const estMinutes = order.pickupLocation.includes("Counter A") ? 15 : 10;
-    const estDate = new Date(placedDate.getTime() + estMinutes * 60000);
-    
-    let estHours = estDate.getHours();
-    const estMins = estDate.getMinutes().toString().padStart(2, "0");
-    const estAmpm = estHours >= 12 ? "PM" : "AM";
-    estHours = estHours % 12;
-    estHours = estHours ? estHours : 12;
-    const estimatedTime = `${estHours}:${estMins} ${estAmpm}`;
-
-    const options = { month: "short", day: "numeric", year: "numeric" };
-    const dateStr = placedDate.toLocaleDateString("en-US", options);
-    let placedHours = placedDate.getHours();
-    const placedMins = placedDate.getMinutes().toString().padStart(2, "0");
-    const placedAmpm = placedHours >= 12 ? "PM" : "AM";
-    placedHours = placedHours % 12;
-    placedHours = placedHours ? placedHours : 12;
-    const placedFormatted = `${dateStr} at ${placedHours}:${placedMins} ${placedAmpm}`;
-
-    const updated = {
-      ...order,
-      placedAt: placedDate.toISOString(),
-      placedFormatted: placedFormatted,
-      estimatedTime: estimatedTime,
-      status: "received",
-      simulatedStatus: undefined,
-    };
-    setOrder(updated);
-    localStorage.setItem("stratizen_active_order", JSON.stringify(updated));
-  };
+  const currentStepIndex = getStepIndex(order.status);
 
   return (
     <AuthLayout>
@@ -148,7 +173,7 @@ function OrderTracking() {
               <span className="material-symbols-outlined">arrow_back</span>
               Back to Menu
             </Link>
-            <h1>Order #{order.id}</h1>
+            <h1>Order #STR-{order.id.substring(0, 8).toUpperCase()}</h1>
             <p className="tracking-placed-date">Placed on {order.placedFormatted}</p>
           </div>
           <div className="est-collection-card">
@@ -188,7 +213,7 @@ function OrderTracking() {
                     <>
                       <div className="timeline-content-header">
                         <h3 className={`timeline-content-title ${currentStepIndex > 0 ? "completed" : "pending"}`}>Order Received</h3>
-                        <span className="timeline-time-badge">{getStepTime(order.placedAt, 0)}</span>
+                        <span className="timeline-time-badge">{formatTime(order.placedAt)}</span>
                       </div>
                       <p className="timeline-desc">Your order has been securely logged in the system.</p>
                     </>
@@ -216,7 +241,7 @@ function OrderTracking() {
                       <div className="timeline-content-header">
                         <h3 className={`timeline-content-title ${currentStepIndex > 1 ? "completed" : "pending"}`}>Payment Confirmed</h3>
                         {currentStepIndex > 1 && (
-                          <span className="timeline-time-badge">{getStepTime(order.placedAt, 0.5)}</span>
+                          <span className="timeline-time-badge">{formatTime(order.placedAt)}</span>
                         )}
                       </div>
                       <p className={`timeline-desc ${currentStepIndex < 1 ? "pending" : ""}`}>
@@ -248,8 +273,8 @@ function OrderTracking() {
                     <>
                       <div className="timeline-content-header">
                         <h3 className={`timeline-content-title ${currentStepIndex > 2 ? "completed" : "pending"}`}>Food Being Prepared</h3>
-                        {currentStepIndex > 2 && (
-                          <span className="timeline-time-badge">{getStepTime(order.placedAt, 3)}</span>
+                        {order.prep_started_at && (
+                          <span className="timeline-time-badge">{formatTime(order.prep_started_at)}</span>
                         )}
                       </div>
                       <p className={`timeline-desc ${currentStepIndex < 2 ? "pending" : ""}`}>
@@ -281,8 +306,8 @@ function OrderTracking() {
                     <>
                       <div className="timeline-content-header">
                         <h3 className={`timeline-content-title ${currentStepIndex > 3 ? "completed" : "pending"}`}>Ready for Pickup</h3>
-                        {currentStepIndex > 3 && (
-                          <span className="timeline-time-badge">{getStepTime(order.placedAt, 8)}</span>
+                        {order.ready_at && (
+                          <span className="timeline-time-badge">{formatTime(order.ready_at)}</span>
                         )}
                       </div>
                       <p className={`timeline-desc ${currentStepIndex < 3 ? "pending" : ""}`}>
@@ -366,58 +391,10 @@ function OrderTracking() {
               <p className="support-desc">
                 If you have any questions about your order, please contact campus cafeteria support.
               </p>
-              <button className="support-btn" onClick={() => alert("Support ticket created! We will contact you shortly.")}>
+              <button className="support-btn cursor-pointer border-none" onClick={() => alert("Support ticket created! We will contact you shortly.")}>
                 Contact Support
               </button>
             </div>
-          </div>
-        </div>
-
-        {/* Developer Simulation Control */}
-        <div className="dev-simulator-panel">
-          <h4 className="dev-simulator-title">
-            <span className="material-symbols-outlined">code</span>
-            Order Status Simulator (Dev Tools)
-          </h4>
-          <p className="dev-simulator-desc">
-            Use these controls to instantly cycle through the order lifecycle. The active order state is synchronized
-            with `localStorage` and will persist across page refreshes.
-          </p>
-          <div className="dev-simulator-controls">
-            <button
-              className={`dev-sim-btn ${order.status === "received" ? "active" : ""}`}
-              onClick={() => setSimulatedStatus("received")}
-            >
-              1. Received
-            </button>
-            <button
-              className={`dev-sim-btn ${order.status === "confirmed" ? "active" : ""}`}
-              onClick={() => setSimulatedStatus("confirmed")}
-            >
-              2. Confirmed
-            </button>
-            <button
-              className={`dev-sim-btn ${order.status === "preparing" ? "active" : ""}`}
-              onClick={() => setSimulatedStatus("preparing")}
-            >
-              3. Preparing
-            </button>
-            <button
-              className={`dev-sim-btn ${order.status === "ready" ? "active" : ""}`}
-              onClick={() => setSimulatedStatus("ready")}
-            >
-              4. Ready
-            </button>
-            <button
-              className={`dev-sim-btn ${order.status === "collected" ? "active" : ""}`}
-              onClick={() => setSimulatedStatus("collected")}
-            >
-              5. Collected
-            </button>
-            <button className="dev-sim-btn reset" onClick={resetOrderTimer}>
-              <span className="material-symbols-outlined" style={{ fontSize: "14px", marginRight: "4px" }}>restart_alt</span>
-              Reset Timer
-            </button>
           </div>
         </div>
       </div>

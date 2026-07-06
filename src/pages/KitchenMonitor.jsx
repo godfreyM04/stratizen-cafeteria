@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "../lib/supabase";
+import ChefNotificationCentre from "../components/ChefNotificationCentre";
+import ChefLogoutButton from "../components/ChefLogoutButton";
 import "../styles/KitchenMonitor.css";
 
 // Helper to format ticking duration (e.g., "18m 42s")
@@ -38,148 +41,82 @@ function KitchenMonitor() {
     return () => clearInterval(timer);
   }, []);
 
-  // Load and sync preparing orders from localStorage
-  useEffect(() => {
-    const loadOrders = () => {
-      let allOrders = [];
-      const stored = localStorage.getItem("stratizen_chef_orders");
-      if (stored) {
-        try {
-          allOrders = JSON.parse(stored);
-        } catch (e) {
-          console.error("Failed to parse chef orders:", e);
-        }
-      }
+  const loadPreparingOrders = async () => {
+    try {
+      const { data: preparingData, error: fetchError } = await supabase
+        .from("orders")
+        .select("*, order_items(*, menu(*))")
+        .eq("status", "preparing")
+        .order("prep_started_at", { ascending: true });
 
-      // Check for active student orders in localStorage
-      const activeOrderStr = localStorage.getItem("stratizen_active_order");
-      if (activeOrderStr) {
-        try {
-          const activeOrder = JSON.parse(activeOrderStr);
-          const exists = allOrders.some(o => o.id === activeOrder.id || o.id.toString() === activeOrder.id.toString());
-          
-          if (!exists && activeOrder.status !== "collected") {
-            const formattedItems = activeOrder.items
-              ? activeOrder.items.map(i => `${i.quantity}x ${i.name}`).join(", ")
-              : "1x Custom Order";
-              
-            const newOrder = {
-              id: activeOrder.id,
-              name: activeOrder.items?.[0]?.name ? `${activeOrder.items[0].quantity}x ${activeOrder.items[0].name}` : "Student Order",
-              items: formattedItems,
-              time: "Placed just now",
-              placedAt: activeOrder.placedAt || new Date().toISOString(),
-              status: activeOrder.status || "pending",
-              total: activeOrder.total || 0,
-              itemsList: activeOrder.items || []
-            };
-            
-            allOrders.unshift(newOrder);
-            localStorage.setItem("stratizen_chef_orders", JSON.stringify(allOrders));
-          } else if (exists) {
-            // Update status in chef orders if active student order status changed
-            allOrders = allOrders.map(o => {
-              if (o.id === activeOrder.id || o.id.toString() === activeOrder.id.toString()) {
-                return { ...o, status: activeOrder.status };
-              }
-              return o;
-            });
-          }
-        } catch (e) {
-          console.error("Failed to parse active student order:", e);
-        }
-      }
+      if (fetchError) throw fetchError;
 
-      // Filter only preparing orders
-      const preparingList = allOrders.filter(o => o.status === "preparing");
-      
-      // Ensure prepStartedAt is set for tracking
-      const mappedList = preparingList.map(o => {
-        let itemsList = o.itemsList || [];
-        if (itemsList.length === 0 && o.items) {
-          const parts = o.items.split(", ");
-          parts.forEach(part => {
-            const match = part.match(/(\d+)x\s+(.+)/);
-            if (match) {
-              itemsList.push({ name: match[2], quantity: parseInt(match[1], 10) });
-            }
-          });
-        }
+      const mapped = (preparingData || []).map(o => ({
+        id: o.id,
+        name: o.student_name || "Student",
+        items: (o.order_items || []).map(oi => `${oi.quantity}x ${oi.menu?.name || 'Meal'}`).join(", "),
+        placedAt: o.created_at,
+        prepStartedAt: o.prep_started_at || o.created_at,
+        itemsList: (o.order_items || []).map(oi => ({
+          name: oi.menu?.name || "Meal",
+          quantity: oi.quantity
+        }))
+      }));
 
-        // If prepStartedAt is missing, estimate it based on placedAt
-        let prepStartedAt = o.prepStartedAt;
-        if (!prepStartedAt) {
-          if (o.placedAt) {
-            // Started 1 min after placed
-            prepStartedAt = new Date(new Date(o.placedAt).getTime() + 60000).toISOString();
-          } else {
-            // Started 5 mins ago
-            prepStartedAt = new Date(Date.now() - 300000).toISOString();
-          }
-        }
-
-        return {
-          ...o,
-          itemsList,
-          prepStartedAt
-        };
-      });
-
-      setOrders(mappedList);
+      setOrders(mapped);
+    } catch (err) {
+      console.error("Failed to load preparing orders:", err.message);
+    } finally {
       setLoading(false);
-    };
+    }
+  };
 
-    loadOrders();
-    const interval = setInterval(loadOrders, 2000);
-    return () => clearInterval(interval);
+  useEffect(() => {
+    loadPreparingOrders();
+
+    // Subscribe to changes on the orders table in real-time
+    const orderSubscription = supabase
+      .channel("chef_preparing_orders_changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "orders" },
+        () => {
+          console.log("Real-time update in preparing orders");
+          loadPreparingOrders();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      orderSubscription.unsubscribe();
+    };
   }, []);
 
-  const handleMarkReady = (orderId) => {
+  const handleMarkReady = async (orderId) => {
     setProcessingReady(prev => ({ ...prev, [orderId]: true }));
 
-    setTimeout(() => {
-      const stored = localStorage.getItem("stratizen_chef_orders");
-      if (stored) {
-        try {
-          const allOrders = JSON.parse(stored);
-          const updated = allOrders.map(o => {
-            if (o.id === orderId || o.id.toString() === orderId.toString()) {
-              return { 
-                ...o, 
-                status: "ready",
-                readyAt: new Date().toISOString()
-              };
-            }
-            return o;
-          });
-          localStorage.setItem("stratizen_chef_orders", JSON.stringify(updated));
-        } catch (e) {
-          console.error(e);
-        }
-      }
+    try {
+      const { error } = await supabase
+        .from("orders")
+        .update({
+          status: "ready",
+          ready_at: new Date().toISOString()
+        })
+        .eq("id", orderId);
 
-      // Update the active student order if it matches
-      const activeOrderStr = localStorage.getItem("stratizen_active_order");
-      if (activeOrderStr) {
-        try {
-          const activeOrder = JSON.parse(activeOrderStr);
-          if (activeOrder.id === orderId || activeOrder.id.toString() === orderId.toString()) {
-            activeOrder.status = "ready";
-            activeOrder.simulatedStatus = "ready";
-            localStorage.setItem("stratizen_active_order", JSON.stringify(activeOrder));
-          }
-        } catch (e) {
-          console.error(e);
-        }
-      }
+      if (error) throw error;
 
       setOrders(prev => prev.filter(o => o.id !== orderId));
+    } catch (err) {
+      console.error("Failed to mark order as ready:", err.message);
+      alert("Failed to update order status: " + err.message);
+    } finally {
       setProcessingReady(prev => {
         const copy = { ...prev };
         delete copy[orderId];
         return copy;
       });
-    }, 8000); // Give it some simulated delay or make it fast. Wait, 800ms is perfect.
+    }
   };
 
   const handleLogout = async () => {
@@ -200,243 +137,182 @@ function KitchenMonitor() {
     return nameMatch || idMatch || itemsMatch;
   });
 
-  // Split orders into Almost Ready (>= 5 mins) and In Preparation (< 5 mins)
-  const almostReadyOrders = [];
-  const inPrepOrders = [];
-
-  filteredOrders.forEach(order => {
-    const elapsedMs = currentTime - new Date(order.prepStartedAt).getTime();
-    if (elapsedMs >= 300000) { // 5 minutes threshold
-      almostReadyOrders.push(order);
-    } else {
-      inPrepOrders.push(order);
-    }
-  });
+  // Calculate statistics for the top banner
+  const activeCount = orders.length;
+  const overdueCount = orders.filter(o => (currentTime - new Date(o.prepStartedAt).getTime()) > 900000).length; // Over 15 mins
 
   return (
-    <div className="kitchen-monitor-container text-on-background min-h-screen flex overflow-hidden">
-      
-      {/* Sidebar Navigation */}
-      <aside className="h-screen w-64 fixed left-0 top-0 bg-surface-container-low border-r border-outline-variant flex flex-col py-lg z-50 shrink-0">
-        <div className="px-lg mb-xl flex items-center gap-sm">
-          <span className="material-symbols-outlined text-primary text-[32px]">restaurant</span>
-          <div>
-            <h2 className="text-label-lg font-bold text-primary">Stratizen Dining</h2>
-            <p className="text-[10px] text-on-surface-variant uppercase tracking-widest">Chef Management</p>
-          </div>
+    <div className="kitchen-monitor-container text-on-background min-h-screen flex">
+
+      {/* SideNavBar */}
+      <aside className="h-screen w-64 fixed left-0 top-0 bg-surface-container-low border-r border-outline-variant flex flex-col py-lg z-50">
+        <div className="px-md mb-xl">
+          <h1 className="font-headline-lg text-headline-lg text-primary font-bold">Stratizen</h1>
+          <p className="text-on-surface-variant font-label-md mt-xs">Chef Management Portal</p>
         </div>
-        
-        <nav className="flex-1 px-md space-y-1">
-          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high rounded-lg cursor-pointer transition-all" onClick={() => navigate("/chef/dashboard")}>
+
+        <nav className="flex-1 flex flex-col gap-xs px-sm">
+          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all cursor-pointer rounded-lg" onClick={() => navigate("/chef/dashboard")}>
             <span className="material-symbols-outlined">dashboard</span>
-            <span className="text-label-lg">Kitchen Dashboard</span>
+            <span className="font-label-lg text-label-lg">Kitchen Dashboard</span>
           </div>
-          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high rounded-lg cursor-pointer transition-all" onClick={() => navigate("/chef/pending")}>
-            <span className="material-symbols-outlined">receipt_long</span>
-            <span className="text-label-lg">Order Queue</span>
-          </div>
-          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high rounded-lg cursor-pointer transition-all">
+          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all cursor-pointer rounded-lg" onClick={() => navigate("/chef/menu")}>
             <span className="material-symbols-outlined">restaurant_menu</span>
-            <span className="text-label-lg">Menu Manager</span>
+            <span className="font-label-lg text-label-lg">Menu Manager</span>
           </div>
-          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high rounded-lg cursor-pointer transition-all">
-            <span className="material-symbols-outlined">bar_chart</span>
-            <span className="text-label-lg">Analytics</span>
+          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all cursor-pointer rounded-lg" onClick={() => navigate("/chef/pending")}>
+            <span className="material-symbols-outlined">receipt_long</span>
+            <span className="font-label-lg text-label-lg">Order Queue</span>
           </div>
-          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high rounded-lg cursor-pointer transition-all">
-            <span className="material-symbols-outlined">groups</span>
-            <span className="text-label-lg">Staff Settings</span>
+          <div className="flex items-center gap-md bg-secondary-container text-on-secondary-container rounded-lg px-md py-sm cursor-pointer shadow-sm">
+            <span className="material-symbols-outlined" style={{ fontVariationSettings: "'FILL' 1" }}>soup_kitchen</span>
+            <span className="font-label-lg text-label-lg">Kitchen Monitor</span>
+          </div>
+          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all cursor-pointer rounded-lg" onClick={() => navigate("/chef/ready")}>
+            <span className="material-symbols-outlined">storefront</span>
+            <span className="font-label-lg text-label-lg">Ready to Collect</span>
+          </div>
+          <div className="flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high transition-all cursor-pointer rounded-lg" onClick={() => navigate("/chef/history")}>
+            <span className="material-symbols-outlined">history</span>
+            <span className="font-label-lg text-label-lg">Order History</span>
           </div>
         </nav>
-        
-        <div className="px-md mt-auto pt-lg border-t border-outline-variant/30 space-y-1">
-          <button className="w-full text-left flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high rounded-lg transition-all border-none bg-transparent" type="button">
-            <span className="material-symbols-outlined">help</span>
-            <span className="text-label-lg">Help Center</span>
-          </button>
-          <button className="w-full text-left flex items-center gap-md text-on-surface-variant px-md py-sm hover:bg-surface-container-high rounded-lg transition-all border-none bg-transparent" type="button" onClick={handleLogout}>
-            <span className="material-symbols-outlined text-error">logout</span>
-            <span className="text-label-lg text-error">Logout</span>
-          </button>
+
+        <div className="px-md mt-auto pt-lg border-t border-outline-variant/30 space-y-xs">
+          <ChefLogoutButton />
         </div>
       </aside>
 
       {/* Main Content Canvas */}
-      <main className="ml-64 min-h-screen flex-1 flex flex-col overflow-hidden">
-        
+      <main className="ml-64 min-h-screen flex flex-col flex-1">
+
         {/* Top Navigation Bar */}
-        <header className="flex justify-between items-center px-lg w-full sticky top-0 z-40 bg-surface/80 backdrop-blur-md shadow-sm h-16 border-b border-outline-variant/30 shrink-0">
-          <div className="hidden md:flex flex-1 max-w-md mx-xl relative">
-            <span className="material-symbols-outlined absolute left-md top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
-            <input 
-              className="w-full bg-surface-container rounded-full border-none pl-10 pr-md py-sm text-label-lg focus:ring-2 focus:ring-primary outline-none" 
-              placeholder="Search orders..." 
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
+        <header className="w-full h-16 bg-surface/80 backdrop-blur-md shadow-sm flex justify-between items-center px-lg sticky top-0 z-40 border-b border-outline-variant/30">
+          <div className="flex items-center gap-xl flex-1">
+            <div className="flex items-center bg-surface-container rounded-full px-md py-xs w-full max-w-md border border-outline-variant/50 focus-within:border-primary transition-all">
+              <span className="material-symbols-outlined text-on-surface-variant mr-sm">search</span>
+              <input
+                className="bg-transparent border-none focus:ring-0 w-full text-body-md placeholder:text-on-surface-variant/60 outline-none"
+                placeholder="Search preparing tickets..."
+                type="text"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+              />
+            </div>
           </div>
-          <div className="flex items-center gap-md ml-auto">
-            <button className="p-sm text-on-surface-variant hover:text-primary transition-colors border-none bg-transparent"><span className="material-symbols-outlined">notifications</span></button>
-            <button className="p-sm text-on-surface-variant hover:text-primary transition-colors border-none bg-transparent"><span className="material-symbols-outlined">settings</span></button>
-            <img alt="User Profile" className="w-10 h-10 rounded-full border-2 border-outline-variant object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0Mvt-Egr9Z5x2DULCN_4DGrxry3kmsV1_pv9IkMpaxqW0LRol3nPndNED_EM7sDRATQc-R3axIN6WQBkxhRTepkukDfyNVaoKaT7pg72C-W1kl3Iry7r_9yyRH-iwWNq7X2H3v4uowEKU-J46RXmrp1djJJYLEJ5E8tJt-TCexHp4tRTOb_66hXkuFYlc_mL1sB_VFHC5BnbiS5MLCXU6RQLdHvzK7Ms1K5HCb5OLpJaOzEtSZvaB5LA84rd24gu2m6P634mqUw" />
+          <div className="flex items-center gap-lg">
+            <ChefNotificationCentre />
+            <div className="flex items-center gap-md">
+              <div className="text-right hidden sm:block">
+                <p className="font-label-lg text-label-lg text-on-surface">Chef Anderson</p>
+                <p className="text-xs text-on-surface-variant">Main Canteen</p>
+              </div>
+              <div className="w-10 h-10 rounded-full border-2 border-primary overflow-hidden">
+                <img className="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuB0Mvt-Egr9Z5x2DULCN_4DGrxry3kmsV1_pv9IkMpaxqW0LRol3nPndNED_EM7sDRATQc-R3axIN6WQBkxhRTepkukDfyNVaoKaT7pg72C-W1kl3Iry7r_9yyRH-iwWNq7X2H3v4uowEKU-J46RXmrp1djJJYLEJ5E8tJt-TCexHp4tRTOb_66hXkuFYlc_mL1sB_VFHC5BnbiS5MLCXU6RQLdHvzK7Ms1K5HCb5OLpJaOzEtSZvaB5LA84rd24gu2m6P634mqUw" alt="Chef Anderson" />
+              </div>
+            </div>
           </div>
         </header>
 
-        {/* Content Workspace */}
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-lg space-y-xl">
-          <div className="flex items-center justify-between mb-lg shrink-0">
+        {/* Content Area */}
+        <section className="p-lg lg:p-xl space-y-lg flex-1">
+
+          {/* Stats Bar */}
+          <div className="flex flex-wrap justify-between items-center gap-md">
             <div>
-              <h2 className="text-headline-lg text-on-background font-bold">Kitchen Live Monitor</h2>
-              <p className="text-on-surface-variant text-label-lg">Real-time order tracking and status management</p>
+              <h2 className="font-headline-lg text-headline-lg text-primary">Live Kitchen Monitor</h2>
+              <p className="text-on-surface-variant font-body-md">Monitor and expedite orders currently in preparation.</p>
             </div>
-            <div className="bg-surface-container rounded-lg p-xs">
-              <button className="px-md py-sm bg-surface text-primary rounded-md shadow-sm text-label-lg border-none cursor-default" type="button">Active View</button>
+            
+            <div className="flex items-center gap-md">
+              <div className="bg-surface-container-lowest border border-outline-variant/30 px-lg py-sm rounded-xl flex items-center gap-md">
+                <span className="material-symbols-outlined text-primary text-3xl">soup_kitchen</span>
+                <div>
+                  <p className="text-xs text-on-surface-variant uppercase font-bold">Active Preparations</p>
+                  <p className="text-xl font-bold text-on-surface">{activeCount} Orders</p>
+                </div>
+              </div>
+              <div className="bg-surface-container-lowest border border-outline-variant/30 px-lg py-sm rounded-xl flex items-center gap-md">
+                <span className={`material-symbols-outlined text-3xl ${overdueCount > 0 ? "text-error animate-pulse" : "text-secondary"}`}>warning</span>
+                <div>
+                  <p className="text-xs text-on-surface-variant uppercase font-bold">Overdue (&gt;15m)</p>
+                  <p className={`text-xl font-bold ${overdueCount > 0 ? "text-error" : "text-on-surface"}`}>{overdueCount} Orders</p>
+                </div>
+              </div>
             </div>
           </div>
 
+          {/* Preparing Bento Grid */}
           {loading ? (
             <div className="flex items-center justify-center min-h-[300px]">
               <span className="animate-spin material-symbols-outlined text-4xl text-primary">sync</span>
             </div>
           ) : filteredOrders.length === 0 ? (
             <div className="flex flex-col items-center justify-center p-xl bg-surface-container-lowest rounded-xl border border-dashed border-outline-variant text-on-surface-variant gap-sm min-h-[300px]">
-              <span className="material-symbols-outlined text-5xl text-secondary">check_circle</span>
-              <p className="font-title-lg text-on-surface">No Active Orders</p>
-              <p className="text-body-md text-center max-w-sm">There are currently no orders in preparation. Start preparing new orders from the Order Queue.</p>
+              <span className="material-symbols-outlined text-5xl text-secondary">done_all</span>
+              <p className="font-title-lg text-on-surface">No Orders in Preparation</p>
+              <p className="text-body-md text-center max-w-sm">There are no orders being prepared right now. Start preparing new orders from the Order Queue.</p>
             </div>
           ) : (
-            <div className="space-y-xl">
-              
-              {/* Status Section: Almost Ready */}
-              {almostReadyOrders.length > 0 && (
-                <section>
-                  <div className="flex items-center justify-between mb-md sticky top-0 bg-background/95 backdrop-blur-sm py-2 z-10 border-b border-outline-variant/30">
-                    <div className="flex items-center gap-sm">
-                      <span className="material-symbols-outlined text-secondary">check_circle</span>
-                      <h3 className="text-title-lg font-bold">Almost Ready</h3>
-                      <span className="bg-secondary-container text-on-secondary-container px-sm py-[2px] rounded-full text-label-md font-bold">
-                        {almostReadyOrders.length} {almostReadyOrders.length === 1 ? "Order" : "Orders"}
-                      </span>
+            <div className="order-grid">
+              {filteredOrders.map((order) => {
+                const elapsedMs = currentTime - new Date(order.prepStartedAt).getTime();
+                const totalElapsedMs = currentTime - new Date(order.placedAt).getTime();
+                const isOverdue = elapsedMs > 900000; // 15 minutes
+
+                return (
+                  <div key={order.id} className={`bg-surface-container-lowest border rounded-xl p-md flex flex-col gap-md hover:shadow-md transition-all group order-card-transition ${isOverdue ? "border-error/50 bg-error-container/5" : "border-outline-variant/30"}`}>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <h3 className="font-title-lg text-body-lg font-bold text-on-surface">{order.name}</h3>
+                        <p className="text-xs text-on-surface-variant">Order #STR-{order.id.substring(0, 4).toUpperCase()} • {formatSimpleElapsed(totalElapsedMs)}</p>
+                      </div>
+                      
+                      {/* Timer */}
+                      <div className={`flex items-center gap-xs px-sm py-1 rounded-full text-xs font-bold ${isOverdue ? "bg-error text-on-error" : "bg-primary-container text-on-primary-container"}`}>
+                        <span className="material-symbols-outlined text-[14px]">schedule</span>
+                        <span>{formatDuration(elapsedMs)}</span>
+                      </div>
                     </div>
-                    <span className="text-on-surface-variant text-label-md">Expected delivery &lt; 2m</span>
-                  </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-md">
-                    {almostReadyOrders.map(order => {
-                      const elapsedMs = currentTime - new Date(order.prepStartedAt).getTime();
-                      const isCritical = elapsedMs >= 600000; // 10 minutes critical threshold
-
-                      return (
-                        <div 
-                          key={order.id} 
-                          className={`order-card-gradient border border-outline-variant rounded-xl p-md shadow-sm transition-all duration-300 ${
-                            isCritical ? "critical-glow animate-pulse-slow border-error/50" : ""
-                          }`}
-                        >
-                          <div className="flex justify-between items-start mb-md">
-                            <h4 className="text-title-lg text-primary font-bold">#{order.id}</h4>
-                            <span className={`font-bold text-label-md px-sm py-1 rounded-full ${
-                              isCritical ? "text-error bg-error-container" : "text-on-surface-variant bg-surface-container-high"
-                            }`}>
-                              {formatDuration(elapsedMs)}
-                            </span>
-                          </div>
-                          <div className="mb-lg">
-                            <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block mb-1">Items</span>
-                            <ul className="text-body-md space-y-1 font-medium">
-                              {order.itemsList.map((item, index) => (
-                                <li key={index}>• {item.quantity}x {item.name}</li>
-                              ))}
-                            </ul>
-                          </div>
-                          <button 
-                            className="mark-ready w-full bg-secondary text-on-secondary py-sm rounded-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-label-lg text-white border-none cursor-pointer"
-                            type="button"
-                            onClick={() => handleMarkReady(order.id)}
-                            disabled={processingReady[order.id]}
-                          >
-                            {processingReady[order.id] ? (
-                              <>
-                                <span className="material-symbols-outlined animate-spin text-[20px]">sync</span>
-                                Completing...
-                              </>
-                            ) : (
-                              <>
-                                <span className="material-symbols-outlined text-[20px]">check_circle</span> 
-                                Mark Ready
-                              </>
-                            )}
-                          </button>
+                    {/* Food Items list */}
+                    <div className="space-y-sm py-sm border-y border-outline-variant/20 flex-1">
+                      {order.itemsList.map((item, index) => (
+                        <div key={index} className="flex justify-between text-sm">
+                          <span className="text-on-surface font-medium">{item.quantity}x {item.name}</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
+                      ))}
+                    </div>
 
-              {/* Status Section: In Preparation */}
-              {inPrepOrders.length > 0 && (
-                <section>
-                  <div className="flex items-center justify-between mb-md sticky top-0 bg-background/95 backdrop-blur-sm py-2 z-10 border-b border-outline-variant/30">
-                    <div className="flex items-center gap-sm">
-                      <span className="material-symbols-outlined text-primary">soup_kitchen</span>
-                      <h3 className="text-title-lg font-bold">In Preparation</h3>
-                      <span className="bg-primary-container text-primary px-sm py-[2px] rounded-full text-label-md font-bold">
-                        {inPrepOrders.length} {inPrepOrders.length === 1 ? "Order" : "Orders"}
+                    <div className="flex justify-between items-center pt-xs">
+                      <span className="text-xs text-on-surface-variant">
+                        Prep started {formatSimpleElapsed(elapsedMs)}
                       </span>
+                      <button
+                        className={`bg-primary text-on-primary px-lg py-sm rounded-lg font-label-lg shadow-sm hover:shadow-md active:scale-95 transition-all flex items-center gap-sm border-none cursor-pointer ${processingReady[order.id] ? "opacity-70 cursor-not-allowed" : ""}`}
+                        type="button"
+                        onClick={() => handleMarkReady(order.id)}
+                        disabled={processingReady[order.id]}
+                      >
+                        {processingReady[order.id] ? (
+                          <>
+                            <span className="material-symbols-outlined animate-spin text-sm">sync</span>
+                            Updating...
+                          </>
+                        ) : (
+                          <>
+                            <span className="material-symbols-outlined text-sm">check</span>
+                            Mark Ready
+                          </>
+                        )}
+                      </button>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-md pb-20">
-                    {inPrepOrders.map(order => {
-                      const elapsedMs = currentTime - new Date(order.prepStartedAt).getTime();
-
-                      return (
-                        <div key={order.id} className="order-card-gradient border border-outline-variant/50 rounded-xl p-md shadow-sm transition-all duration-300">
-                          <div className="flex justify-between items-start mb-md">
-                            <h4 className="text-title-lg text-primary font-bold">#{order.id}</h4>
-                            <span className="text-on-surface-variant font-medium text-label-md">
-                              {formatSimpleElapsed(elapsedMs)}
-                            </span>
-                          </div>
-                          <div className="mb-lg">
-                            <span className="text-[10px] font-bold text-on-surface-variant uppercase tracking-wider block mb-1">Items</span>
-                            <ul className="text-body-md space-y-1">
-                              {order.itemsList.map((item, index) => (
-                                <li key={index}>• {item.quantity}x {item.name}</li>
-                              ))}
-                            </ul>
-                          </div>
-                          <button 
-                            className="mark-ready w-full bg-secondary text-on-secondary py-sm rounded-lg hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-label-lg text-white border-none cursor-pointer"
-                            type="button"
-                            onClick={() => handleMarkReady(order.id)}
-                            disabled={processingReady[order.id]}
-                          >
-                            {processingReady[order.id] ? (
-                              <>
-                                <span className="material-symbols-outlined animate-spin text-[20px]">sync</span>
-                                Completing...
-                              </>
-                            ) : (
-                              <>
-                                <span className="material-symbols-outlined text-[20px]">check_circle</span> 
-                                Mark Ready
-                              </>
-                            )}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </section>
-              )}
-
+                );
+              })}
             </div>
           )}
-
-        </div>
+        </section>
       </main>
     </div>
   );

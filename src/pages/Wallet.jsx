@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import AuthLayout from "../components/AuthLayout";
 import { useToast } from "../context/ToastContext";
+import { useAuth } from "../context/AuthContext";
+import { supabase } from "../lib/supabase";
 import "../styles/Wallet.css";
 
 const formatKES = (price) => {
@@ -45,46 +47,141 @@ const formatTransactionTimestamp = (timestamp) => {
   }
 };
 
-// Initial default transactions matching the Stitch design system exactly, with dynamic timestamps
-const DEFAULT_TRANSACTIONS = [
-  { id: "tx-1", type: "purchase", title: "Main Dining Hall", desc: "Lunch Combo", timestamp: new Date(new Date().setHours(12, 45, 0, 0)).toISOString(), amount: 12.50 },
-  { id: "tx-2", type: "purchase", title: "Science Bldg Cafe", desc: "Iced Latte", timestamp: new Date(new Date().setHours(9, 15, 0, 0)).toISOString(), amount: 4.75 },
-  { id: "tx-3", type: "deposit", title: "Deposit using M-Pesa", desc: "Auto-Reload", timestamp: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), amount: 50.00 },
-  { id: "tx-4", type: "purchase", title: "Late Night Grill", desc: "Burger & Fries", timestamp: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), amount: 14.20 },
-  { id: "tx-5", type: "purchase", title: "Library Kiosk", desc: "Muffin & Tea", timestamp: new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toISOString(), amount: 6.50 },
-];
-
 function Wallet() {
+  const { user } = useAuth();
   const { addToast } = useToast();
 
-  const [balance, setBalance] = useState(() => {
-    const cached = localStorage.getItem("stratizen_wallet_balance");
-    return cached ? parseFloat(cached) : 42.50; // Stitch design starts with KES 42.50
-  });
-
-  const [transactions, setTransactions] = useState(() => {
-    const cached = localStorage.getItem("stratizen_wallet_transactions");
-    if (cached) {
-      try {
-        return JSON.parse(cached);
-      } catch (err) {
-        console.error("Error parsing cached transactions:", err);
-      }
-    }
-    return DEFAULT_TRANSACTIONS;
-  });
-
+  const [balance, setBalance] = useState(0);
+  const [transactions, setTransactions] = useState([]);
   const [showDepositModal, setShowDepositModal] = useState(false);
   const [depositAmount, setDepositAmount] = useState("");
+  const [loading, setLoading] = useState(true);
+  const [isDepositing, setIsDepositing] = useState(false);
 
-  // Sync state changes with localStorage
-  useEffect(() => {
-    localStorage.setItem("stratizen_wallet_balance", balance.toFixed(2));
-  }, [balance]);
+  const loadWalletData = async () => {
+    if (!user) return;
+    try {
+      console.log(`[Wallet] Loading wallet and transaction data for user: ${user.id}`);
+      
+      // 1. Fetch wallet balance
+      let { data: wallet, error: walletError } = await supabase
+        .from("wallets")
+        .select("balance")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      
+      if (walletError) {
+        console.error("[Wallet] Fetch balance query error:", walletError);
+        throw walletError;
+      }
+
+      // If wallet record does not exist, create one automatically initialized to KES 0.00
+      if (!wallet) {
+        console.log("[Wallet] Wallet record not found. Initializing wallet to KES 0.00...");
+        const { data: newWallet, error: createError } = await supabase
+          .from("wallets")
+          .insert({ user_id: user.id, balance: 0.00 })
+          .select()
+          .single();
+
+        if (createError) {
+          console.error("[Wallet] Failed to initialize new wallet record:", {
+            code: createError.code,
+            message: createError.message,
+            details: createError.details
+          });
+          throw createError;
+        }
+        wallet = newWallet;
+        console.log("[Wallet] Wallet initialized successfully:", wallet);
+      }
+      
+      if (wallet) {
+        setBalance(parseFloat(wallet.balance));
+      }
+
+      // 2. Fetch transaction history
+      const { data: txs, error: txsError } = await supabase
+        .from("wallet_transactions")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("created_at", { ascending: false });
+
+      if (txsError) {
+        console.error("[Wallet] Fetch transactions query error:", txsError);
+        throw txsError;
+      }
+
+      // Map DB transactions to UI structure
+      const mapped = (txs || []).map(tx => ({
+        id: tx.id,
+        type: tx.type,
+        title: tx.type === "deposit" ? "Deposit using M-Pesa" : "Main Dining Hall",
+        desc: tx.description || (tx.type === "deposit" ? "Manual Deposit" : "Food Purchase"),
+        timestamp: tx.created_at,
+        amount: parseFloat(tx.amount)
+      }));
+      setTransactions(mapped);
+    } catch (err) {
+      console.error("[Wallet] Failed to load wallet details:", err.message || err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
-    localStorage.setItem("stratizen_wallet_transactions", JSON.stringify(transactions));
-  }, [transactions]);
+    if (!user) return;
+
+    loadWalletData();
+
+    // Subscribe to wallet balance changes in real-time
+    const walletSubscription = supabase
+      .channel(`wallet_balance_${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "wallets", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.new) {
+            console.log("[Wallet] Real-time wallet update received:", payload.new);
+            setBalance(parseFloat(payload.new.balance));
+          }
+        }
+      )
+      .subscribe();
+
+    // Subscribe to transactions in real-time
+    const txSubscription = supabase
+      .channel(`wallet_txs_${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "wallet_transactions", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          if (payload.new) {
+            console.log("[Wallet] Real-time transaction insert received:", payload.new);
+            const tx = payload.new;
+            const newTx = {
+              id: tx.id,
+              type: tx.type,
+              title: tx.type === "deposit" ? "Deposit using M-Pesa" : "Main Dining Hall",
+              desc: tx.description || (tx.type === "deposit" ? "Manual Deposit" : "Food Purchase"),
+              timestamp: tx.created_at,
+              amount: parseFloat(tx.amount)
+            };
+            setTransactions(prev => {
+              // Avoid duplicates if already fetched
+              if (prev.some(t => t.id === tx.id)) return prev;
+              return [newTx, ...prev];
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      walletSubscription.unsubscribe();
+      txSubscription.unsubscribe();
+    };
+  }, [user]);
 
   const handleDepositClick = () => {
     setShowDepositModal(true);
@@ -95,7 +192,7 @@ function Wallet() {
     setDepositAmount("");
   };
 
-  const handleDepositSubmit = (e) => {
+  const handleDepositSubmit = async (e) => {
     e.preventDefault();
     const amount = parseFloat(depositAmount);
     if (isNaN(amount) || amount <= 0) {
@@ -103,23 +200,55 @@ function Wallet() {
       return;
     }
 
-    // Update balance
-    const nextBalance = balance + amount;
-    setBalance(nextBalance);
+    setIsDepositing(true);
+    console.log(`[Wallet] Initiating atomic deposit of KES ${amount} for user: ${user.id}`);
 
-    // Create deposit transaction
-    const newTx = {
-      id: "tx-dep-" + Date.now(),
-      type: "deposit",
-      title: "Deposit using M-Pesa",
-      desc: "Manual Deposit",
-      timestamp: new Date().toISOString(),
-      amount: amount
-    };
+    try {
+      // Execute the atomic deposit RPC in Supabase
+      const { data: newBalance, error: rpcError } = await supabase.rpc("deposit_funds", {
+        p_user_id: user.id,
+        p_amount: amount
+      });
 
-    setTransactions((prevTx) => [newTx, ...prevTx]);
-    addToast(`Successfully deposited KES ${formatKES(amount)} using M-Pesa!`);
-    handleModalClose();
+      if (rpcError) {
+        console.error("[Wallet] Deposit RPC transaction failed:", {
+          code: rpcError.code,
+          message: rpcError.message,
+          details: rpcError.details
+        });
+
+        let userMessage = "Failed to deposit funds. Please try again.";
+        if (rpcError.code === "42501") {
+          userMessage = "Permission denied. Row Level Security policies do not authorize this update.";
+        } else if (rpcError.code === "23514") {
+          userMessage = "Deposit amount is invalid or violates wallet limits.";
+        } else if (rpcError.message?.includes("violates row-level security policy")) {
+          userMessage = "Security policy violation: You do not have permissions to modify this wallet.";
+        } else if (rpcError.message) {
+          userMessage = `Database error: ${rpcError.message}`;
+        }
+        
+        alert(userMessage);
+        setIsDepositing(false);
+        return;
+      }
+
+      console.log(`[Wallet] Atomic deposit successful. New balance returned: KES ${newBalance}`);
+      
+      // Optimistic/Immediate UI update
+      setBalance(parseFloat(newBalance));
+      
+      // Force reload transaction list to catch the new ledger record
+      await loadWalletData();
+
+      addToast(`Successfully deposited KES ${formatKES(amount)} using M-Pesa!`);
+      handleModalClose();
+    } catch (err) {
+      console.error("[Wallet] Submit handler caught error:", err);
+      alert(err.message || "Failed to process deposit. Please check your connection.");
+    } finally {
+      setIsDepositing(false);
+    }
   };
 
   // Calculate spending dynamically
@@ -138,7 +267,7 @@ function Wallet() {
     const total = transactions
       .filter((tx) => {
         if (tx.type !== "purchase") return false;
-        const txTime = new Date(tx.timestamp || tx.time).getTime();
+        const txTime = new Date(tx.timestamp).getTime();
         return txTime >= dayStart && txTime < dayEnd;
       })
       .reduce((sum, tx) => sum + tx.amount, 0);
@@ -148,6 +277,17 @@ function Wallet() {
   const maxSpend = Math.max(...dailySpends);
   const todayDayIndex = (new Date().getDay() + 6) % 7; // Monday = 0, Sunday = 6
   const dayLabels = ["M", "T", "W", "T", "F", "S", "S"];
+
+  if (loading) {
+    return (
+      <AuthLayout>
+        <div className="flex flex-col items-center justify-center min-h-[60vh] gap-md">
+          <span className="material-symbols-outlined animate-spin text-[48px] text-primary">sync</span>
+          <p className="text-on-surface-variant font-medium">Loading wallet details...</p>
+        </div>
+      </AuthLayout>
+    );
+  }
 
   return (
     <AuthLayout>
@@ -172,7 +312,7 @@ function Wallet() {
 
             {/* Quick Actions */}
             <div className="quick-actions-row">
-              <button className="deposit-button" onClick={handleDepositClick}>
+              <button className="deposit-button cursor-pointer border-none" onClick={handleDepositClick}>
                 <span className="material-symbols-outlined">add_circle</span>
                 Deposit Funds
               </button>
@@ -238,7 +378,7 @@ function Wallet() {
                   Transaction History
                 </h2>
                 <button 
-                  className="view-all-btn" 
+                  className="view-all-btn cursor-pointer border-none bg-transparent" 
                   onClick={() => alert("Detailed statement download coming soon!")}
                 >
                   View All
@@ -254,7 +394,7 @@ function Wallet() {
                       <div 
                         key={tx.id} 
                         className={`transaction-row ${isDeposit ? "transaction-row-deposit" : ""}`}
-                        onClick={() => alert(`Transaction Details:\n\nTitle: ${tx.title}\nDescription: ${tx.desc}\nTime: ${formatTransactionTimestamp(tx.timestamp || tx.time)}\nAmount: ${isDeposit ? "+" : "-"}KES ${formatKES(tx.amount)}`)}
+                        onClick={() => alert(`Transaction Details:\n\nTitle: ${tx.title}\nDescription: ${tx.desc}\nTime: ${formatTransactionTimestamp(tx.timestamp)}\nAmount: ${isDeposit ? "+" : "-"}KES ${formatKES(tx.amount)}`)}
                       >
                         <div className="transaction-left-block">
                           <div className={`tx-icon-wrapper ${
@@ -276,7 +416,7 @@ function Wallet() {
                           <div className="tx-details">
                             <h4 className="tx-title">{tx.title}</h4>
                             <p className="tx-time-desc">
-                              {formatTransactionTimestamp(tx.timestamp || tx.time)} • {tx.desc}
+                              {formatTransactionTimestamp(tx.timestamp)} • {tx.desc}
                             </p>
                           </div>
                         </div>
@@ -325,8 +465,10 @@ function Wallet() {
                 </div>
 
                 <div className="modal-actions">
-                  <button type="button" className="modal-btn-cancel" onClick={handleModalClose}>Cancel</button>
-                  <button type="submit" className="modal-btn-confirm">Deposit</button>
+                  <button type="button" className="modal-btn-cancel cursor-pointer border-none" onClick={handleModalClose} disabled={isDepositing}>Cancel</button>
+                  <button type="submit" className="modal-btn-confirm cursor-pointer border-none" disabled={isDepositing}>
+                    {isDepositing ? "Depositing..." : "Deposit"}
+                  </button>
                 </div>
               </form>
             </div>
