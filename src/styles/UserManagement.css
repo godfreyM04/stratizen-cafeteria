@@ -1210,3 +1210,15 @@
   font-size: 16px;
 }
 
+/* Unsuspend option style */
+.um-dropdown-item.unsuspend {
+  background-color: #2e7d32;
+  color: #ffffff;
+  font-weight: 600;
+  transition: background-color 0.15s;
+}
+
+.um-dropdown-item.unsuspend:hover {
+  background-color: #1b5e20;
+}
+

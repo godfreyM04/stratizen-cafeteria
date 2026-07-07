@@ -25,20 +25,10 @@ function Login() {
     e.preventDefault();
     setError("");
 
-    if (activeTab === "student" && email === "chef1@gmail.com") {
-      setError("Please use the Chef login tab.");
-      return;
-    }
-
-    if (activeTab === "chef" && email !== "chef1@gmail.com") {
-      setError("This account is not registered as a chef account.");
-      return;
-    }
-
     setLoading(true);
 
     try {
-      await login(email, password);
+      await login(email, password, activeTab);
       if (activeTab === "chef") {
         navigate("/chef/dashboard");
       } else {

@@ -250,6 +250,24 @@ function UserManagement() {
     }
   };
 
+  const handleUnsuspendStudent = async (student) => {
+    if (!student) return;
+    try {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ phone_number: "" })
+        .eq("id", student.id);
+
+      if (error) throw error;
+
+      showToast(`${student.fullName} has been unsuspended.`);
+      fetchStudents();
+    } catch (err) {
+      console.error("[UM] Unsuspend error:", err);
+      showToast("Failed to unsuspend student. Please try again.", "error");
+    }
+  };
+
   const handleDeleteChef = async () => {
     if (!chefToDelete) return;
     try {
@@ -604,38 +622,47 @@ function UserManagement() {
                                 </span>
                               </td>
                               <td style={{ textAlign: "right", position: "relative" }}>
-                                {student.status === "active" && (
-                                  <>
-                                    <button
-                                      className="um-action-btn"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setActiveDropdownId(
-                                          activeDropdownId === student.id ? null : student.id
-                                        );
-                                      }}
-                                    >
-                                      <span className="material-symbols-outlined">more_vert</span>
-                                    </button>
+                                <button
+                                  className="um-action-btn"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    setActiveDropdownId(
+                                      activeDropdownId === student.id ? null : student.id
+                                    );
+                                  }}
+                                >
+                                  <span className="material-symbols-outlined">more_vert</span>
+                                </button>
 
-                                    {activeDropdownId === student.id && (
-                                      <div
-                                        className="um-dropdown-menu"
-                                        onClick={(e) => e.stopPropagation()}
+                                {activeDropdownId === student.id && (
+                                  <div
+                                    className="um-dropdown-menu"
+                                    onClick={(e) => e.stopPropagation()}
+                                  >
+                                    {student.status === "active" ? (
+                                      <button
+                                        className="um-dropdown-item suspend"
+                                        onClick={() => {
+                                          setStudentToSuspend(student);
+                                          setActiveDropdownId(null);
+                                        }}
                                       >
-                                        <button
-                                          className="um-dropdown-item suspend"
-                                          onClick={() => {
-                                            setStudentToSuspend(student);
-                                            setActiveDropdownId(null);
-                                          }}
-                                        >
-                                          <span className="material-symbols-outlined">block</span>
-                                          Suspend Student
-                                        </button>
-                                      </div>
+                                        <span className="material-symbols-outlined">block</span>
+                                        Suspend Student
+                                      </button>
+                                    ) : (
+                                      <button
+                                        className="um-dropdown-item unsuspend"
+                                        onClick={() => {
+                                          handleUnsuspendStudent(student);
+                                          setActiveDropdownId(null);
+                                        }}
+                                      >
+                                        <span className="material-symbols-outlined">check_circle</span>
+                                        Unsuspend Student
+                                      </button>
                                     )}
-                                  </>
+                                  </div>
                                 )}
                               </td>
                             </tr>

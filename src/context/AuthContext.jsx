@@ -133,7 +133,7 @@ export const AuthProvider = ({ children }) => {
 
         if (session?.user) {
           const currentUserId = session.user.id;
-          const userProfile = await fetchProfile(currentUserId);
+          let userProfile = await fetchProfile(currentUserId);
           
           if (userProfile && userProfile.phone_number === "suspended") {
             console.log("[Auth] Session active but student is suspended. Logging out...");
@@ -144,6 +144,18 @@ export const AuthProvider = ({ children }) => {
             await supabase.auth.signOut();
             setLoading(false);
             return;
+          }
+
+          // Self-healing role correction for chef on session load
+          if (userProfile && userProfile.role !== "chef" && session.user.user_metadata?.role === "chef") {
+            console.log("[Auth] Self-healing chef role on session load...");
+            const { error: updateErr } = await supabase
+              .from("profiles")
+              .update({ role: "chef" })
+              .eq("id", currentUserId);
+            if (!updateErr) {
+              userProfile = await fetchProfile(currentUserId);
+            }
           }
 
           setUser(session.user);
@@ -229,7 +241,7 @@ export const AuthProvider = ({ children }) => {
   }, []);
 
   // Login function
-  const login = useCallback(async (email, password) => {
+  const login = useCallback(async (email, password, expectedRole) => {
     console.time("[Auth] Login Process");
     try {
       if (email === "admin@gmail.com" && password === "admin") {
@@ -268,16 +280,66 @@ export const AuthProvider = ({ children }) => {
       if (error) throw error;
 
       if (data?.user) {
-        const { data: prof, error: profErr } = await supabase
+        let { data: prof, error: profErr } = await supabase
           .from("profiles")
           .select("*")
           .eq("id", data.user.id)
           .maybeSingle();
 
-        if (prof && prof.phone_number === "suspended") {
+        if (profErr) {
           await supabase.auth.signOut();
-          throw new Error("Your account has been suspended. Please contact administration.");
+          throw profErr;
         }
+
+        // Self-healing check: If user metadata says role is 'chef' but database profile role is not 'chef',
+        // and expectedRole is 'chef', perform a self-healing update (allowed for auth.uid() = id)
+        if (prof && expectedRole === "chef" && prof.role !== "chef" && data.user.user_metadata?.role === "chef") {
+          console.log("[Auth] Self-healing chef role during login...");
+          const { error: updateErr } = await supabase
+            .from("profiles")
+            .update({ role: "chef" })
+            .eq("id", data.user.id);
+          
+          if (!updateErr) {
+            const { data: updatedProf } = await supabase
+              .from("profiles")
+              .select("*")
+              .eq("id", data.user.id)
+              .maybeSingle();
+            if (updatedProf) {
+              prof = updatedProf;
+            }
+          }
+        }
+
+        // 1. If profile doesn't exist, it means the user was deleted/removed
+        if (!prof) {
+          await supabase.auth.signOut();
+          if (expectedRole === "chef") {
+            throw new Error("This chef account no longer exists or has been removed by the system administrator. Please contact the administrator if you believe this is an error.");
+          } else {
+            throw new Error("This account no longer exists. Please contact the system administrator.");
+          }
+        }
+
+        // 2. Validate role
+        if (expectedRole && prof.role !== expectedRole) {
+          await supabase.auth.signOut();
+          if (expectedRole === "chef") {
+            throw new Error("This account is not registered as a chef account.");
+          } else {
+            throw new Error("Please use the Chef login tab.");
+          }
+        }
+
+        // 3. Validate suspension status
+        if (prof.phone_number === "suspended") {
+          await supabase.auth.signOut();
+          throw new Error("Your account has been suspended. Please contact the system administrator for assistance.");
+        }
+
+        setProfile(prof);
+        setCachedProfile(prof);
       }
 
       return data;
