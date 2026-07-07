@@ -13,11 +13,14 @@ import {
 import ChefNotificationCentre from "../components/ChefNotificationCentre";
 import ChefLogoutButton from "../components/ChefLogoutButton";
 import "../styles/MenuManager.css";
+import "../styles/UserManagement.css";
 
 function MenuManager() {
   const { logout, profile } = useAuth();
   const navigate = useNavigate();
   const { addToast } = useToast();
+
+  const isAdmin = profile?.role === "admin";
 
   // State Variables
   const [menuItems, setMenuItems] = useState([]);
@@ -56,8 +59,12 @@ function MenuManager() {
       console.error("Failed to load menu items:", err.message);
       addToast("Failed to load menu items.", "error");
     } finally {
-      setLoading(false);
+      loadMenuCompleted();
     }
+  };
+
+  const loadMenuCompleted = () => {
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -70,7 +77,7 @@ function MenuManager() {
         "postgres_changes",
         { event: "*", schema: "public", table: "menu" },
         (payload) => {
-          console.log("Real-time menu update received on Chef Menu Manager:", payload);
+          console.log("Real-time menu update received on Menu Manager:", payload);
           loadMenu();
         }
       )
@@ -142,6 +149,10 @@ function MenuManager() {
   // Save (Create or Update) Menu Item
   const handleSave = async (e) => {
     e.preventDefault();
+    if (!isAdmin) {
+      addToast("Unauthorized action: Chefs cannot edit the menu.", "error");
+      return;
+    }
     if (!isFormValid()) return;
 
     setIsSaving(true);
@@ -167,6 +178,7 @@ function MenuManager() {
   const handleToggleAvailability = async (item) => {
     const updatedStatus = !item.availability;
     try {
+      // Allow both chef and admin to toggle availability
       await updateMenuItem(item.id, {
         name: item.name,
         category: item.category,
@@ -185,6 +197,10 @@ function MenuManager() {
 
   // Delete item with check for order references
   const handleDeleteItem = async (item) => {
+    if (!isAdmin) {
+      addToast("Unauthorized action: Chefs cannot delete menu items.", "error");
+      return;
+    }
     const hasRefs = await checkItemReferences(item.id);
     const confirmMessage = hasRefs
       ? `This item has been ordered in the past. Permanent deletion is not allowed. Would you like to Archive it (make it unavailable for future orders) instead?`
@@ -208,6 +224,7 @@ function MenuManager() {
 
   // Modal Controls
   const openAddModal = () => {
+    if (!isAdmin) return;
     setIsEditing(false);
     setEditingItemId(null);
     setFormData({
@@ -223,6 +240,7 @@ function MenuManager() {
   };
 
   const openEditModal = (item) => {
+    if (!isAdmin) return;
     setIsEditing(true);
     setEditingItemId(item.id);
     setFormData({
@@ -246,7 +264,7 @@ function MenuManager() {
   const handleLogoutClick = async () => {
     try {
       await logout();
-      navigate("/login");
+      navigate(isAdmin ? "/admin/login" : "/login");
     } catch (err) {
       console.error("Logout failed:", err);
     }
@@ -270,49 +288,97 @@ function MenuManager() {
   return (
     <div className="menu-manager-container">
       {/* Sidebar Navigation */}
-      <aside className="h-screen w-64 fixed left-0 top-0 bg-surface-container-low border-r border-outline-variant flex flex-col py-lg z-50">
-        <div className="px-lg mb-xl">
-          <div className="flex items-center gap-sm mb-xs">
-            <span className="material-symbols-outlined text-primary-container w-8 h-8 flex items-center justify-center text-[32px]">restaurant</span>
-            <h1 className="text-headline-lg text-primary font-bold leading-tight">Stratizen</h1>
+      {isAdmin ? (
+        <aside className="um-sidebar">
+          <div className="um-sidebar-header">
+            <div className="um-avatar-container">
+              <img
+                alt="Admin Avatar"
+                className="um-avatar-img"
+                src="https://lh3.googleusercontent.com/aida-public/AB6AXuCvay2r62p8NstPRWDQVnEvG2a5vkKXxPyO2Cmyl11qxE2ADe4uby2WEcxF7lwhWBH8SELW1nE22f6_wKMfYrCCe2T9zjV2XwDQZ9yGx_HHpse8XN1HoQP-7EZAZVJA5xIKNSmR9A7nQySzL98aNUshx39dwqVhPQXMu7aOHTYENx5lXWiynf_o7w6mO2r5bTFcRlWgLfzY0lZ0Rv7D3a_bS7b6EqppLWAJEWqrX2LvJwiBWt4qbRc"
+              />
+            </div>
+            <div>
+              <h1 className="um-admin-name">Stratizen Admin</h1>
+              <p className="um-admin-role">Executive Control</p>
+            </div>
           </div>
-          <p className="text-label-md text-on-surface-variant opacity-70">Chef Management Portal</p>
-        </div>
-        
-        <nav className="flex-grow px-md space-y-1">
-          <button className="nav-item" onClick={() => navigate("/chef/dashboard")}>
-            <span className="material-symbols-outlined">dashboard</span>
-            <span className="text-label-lg font-medium">Kitchen Dashboard</span>
-          </button>
-          <button className="nav-item active-nav" onClick={() => navigate("/chef/menu")}>
-            <span className="material-symbols-outlined">restaurant_menu</span>
-            <span className="text-label-lg font-medium">Menu Manager</span>
-          </button>
-          <button className="nav-item" onClick={() => navigate("/chef/pending")}>
-            <span className="material-symbols-outlined">receipt_long</span>
-            <span className="text-label-lg font-medium">Order Queue</span>
-          </button>
-          <button className="nav-item" onClick={() => navigate("/chef/monitor")}>
-            <span className="material-symbols-outlined">soup_kitchen</span>
-            <span className="text-label-lg font-medium">Kitchen Monitor</span>
-          </button>
-          <button className="nav-item" onClick={() => navigate("/chef/ready")}>
-            <span className="material-symbols-outlined">storefront</span>
-            <span className="text-label-lg font-medium">Ready to Collect</span>
-          </button>
-          <button className="nav-item" onClick={() => navigate("/chef/history")}>
-            <span className="material-symbols-outlined">history</span>
-            <span className="text-label-lg font-medium">Order History</span>
-          </button>
-        </nav>
 
-        <div className="px-md mt-auto pt-lg border-t border-outline-variant/30 space-y-xs">
-          <ChefLogoutButton />
-        </div>
-      </aside>
+          <nav className="um-nav-menu">
+            <a className="um-nav-item" style={{ cursor: "pointer" }} onClick={() => navigate("/admin/dashboard")}>
+              <span className="material-symbols-outlined">dashboard</span>
+              <span>Dashboard</span>
+            </a>
+            <a className="um-nav-item" style={{ cursor: "pointer" }} onClick={() => navigate("/admin/users")}>
+              <span className="material-symbols-outlined">group</span>
+              <span>User Management</span>
+            </a>
+            <a className="um-nav-item active" style={{ cursor: "pointer" }}>
+              <span className="material-symbols-outlined font-fill">restaurant_menu</span>
+              <span>Menu Management</span>
+            </a>
+            <a className="um-nav-item" style={{ cursor: "pointer" }} onClick={(e) => e.preventDefault()}>
+              <span className="material-symbols-outlined">shopping_cart</span>
+              <span>Orders</span>
+            </a>
+            <a className="um-nav-item" style={{ cursor: "pointer" }} onClick={(e) => e.preventDefault()}>
+              <span className="material-symbols-outlined">analytics</span>
+              <span>Reports & Analytics</span>
+            </a>
+          </nav>
+
+          <div className="um-sidebar-footer">
+            <button className="um-logout-btn" onClick={handleLogoutClick}>
+              <span className="material-symbols-outlined">logout</span>
+              <span>Logout</span>
+            </button>
+          </div>
+        </aside>
+      ) : (
+        <aside className="h-screen w-64 fixed left-0 top-0 bg-surface-container-low border-r border-outline-variant flex flex-col py-lg z-50">
+          <div className="px-lg mb-xl">
+            <div className="flex items-center gap-sm mb-xs">
+              <span className="material-symbols-outlined text-primary-container w-8 h-8 flex items-center justify-center text-[32px]">restaurant</span>
+              <h1 className="text-headline-lg text-primary font-bold leading-tight">Stratizen</h1>
+            </div>
+            <p className="text-label-md text-on-surface-variant opacity-70">Chef Management Portal</p>
+          </div>
+          
+          <nav className="flex-grow px-md space-y-1">
+            <button className="nav-item" onClick={() => navigate("/chef/dashboard")}>
+              <span className="material-symbols-outlined">dashboard</span>
+              <span className="text-label-lg font-medium">Kitchen Dashboard</span>
+            </button>
+            <button className="nav-item active-nav" onClick={() => navigate("/chef/menu")}>
+              <span className="material-symbols-outlined">restaurant_menu</span>
+              <span className="text-label-lg font-medium">Menu Manager</span>
+            </button>
+            <button className="nav-item" onClick={() => navigate("/chef/pending")}>
+              <span className="material-symbols-outlined">receipt_long</span>
+              <span className="text-label-lg font-medium">Order Queue</span>
+            </button>
+            <button className="nav-item" onClick={() => navigate("/chef/monitor")}>
+              <span className="material-symbols-outlined">soup_kitchen</span>
+              <span className="text-label-lg font-medium">Kitchen Monitor</span>
+            </button>
+            <button className="nav-item" onClick={() => navigate("/chef/ready")}>
+              <span className="material-symbols-outlined">storefront</span>
+              <span className="text-label-lg font-medium">Ready to Collect</span>
+            </button>
+            <button className="nav-item" onClick={() => navigate("/chef/history")}>
+              <span className="material-symbols-outlined">history</span>
+              <span className="text-label-lg font-medium">Order History</span>
+            </button>
+          </nav>
+
+          <div className="px-md mt-auto pt-lg border-t border-outline-variant/30 space-y-xs">
+            <ChefLogoutButton />
+          </div>
+        </aside>
+      )}
 
       {/* Main Content Area */}
-      <main className="ml-64 flex-1 flex flex-col min-h-screen">
+      <main className={isAdmin ? "um-main-wrapper" : "ml-64 flex-1 flex flex-col min-h-screen"}>
         {/* Top App Bar */}
         <header className="sticky top-0 z-40 h-16 w-full px-lg bg-surface/80 backdrop-blur-md border-b border-outline-variant/20 flex items-center justify-between">
           <h2 className="text-headline-sm font-bold text-on-surface">Menu Manager</h2>
@@ -327,9 +393,11 @@ function MenuManager() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-             <div className="flex items-center gap-sm">
-              <ChefNotificationCentre />
-            </div>
+            {!isAdmin && (
+              <div className="flex items-center gap-sm">
+                <ChefNotificationCentre />
+              </div>
+            )}
           </div>
         </header>
 
@@ -362,19 +430,21 @@ function MenuManager() {
             </div>
           ) : (
             <div className="menu-grid">
-              {/* Add New Item Placeholder Card */}
-              <div 
-                className="border-2 border-dashed border-outline-variant/30 rounded-xl flex flex-col items-center justify-center p-lg gap-md hover:bg-surface-container-low transition-all cursor-pointer group min-h-[380px]"
-                onClick={openAddModal}
-              >
-                <div className="w-16 h-16 rounded-full bg-primary-container/10 flex items-center justify-center group-hover:scale-110 transition-transform">
-                  <span className="material-symbols-outlined text-primary text-[32px]">add</span>
+              {/* Add New Item Placeholder Card (Admin only) */}
+              {isAdmin && (
+                <div 
+                  className="border-2 border-dashed border-outline-variant/30 rounded-xl flex flex-col items-center justify-center p-lg gap-md hover:bg-surface-container-low transition-all cursor-pointer group min-h-[380px]"
+                  onClick={openAddModal}
+                >
+                  <div className="w-16 h-16 rounded-full bg-primary-container/10 flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <span className="material-symbols-outlined text-primary text-[32px]">add</span>
+                  </div>
+                  <div className="text-center">
+                    <p className="text-title-lg font-bold text-on-surface">Add New Item</p>
+                    <p className="text-body-md text-on-surface-variant">Create a new menu entry</p>
+                  </div>
                 </div>
-                <div className="text-center">
-                  <p className="text-title-lg font-bold text-on-surface">Add New Item</p>
-                  <p className="text-body-md text-on-surface-variant">Create a new menu entry</p>
-                </div>
-              </div>
+              )}
 
               {/* Loop Dishes */}
               {filteredMenuItems.map((item) => (
@@ -404,12 +474,16 @@ function MenuManager() {
                     <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t">
                       <span className="text-white font-bold text-lg">KES {parseFloat(item.price).toLocaleString("en-US", { minimumFractionDigits: 2 })}</span>
                     </div>
-                    <button 
-                      className="absolute top-4 right-4 bg-white/80 backdrop-blur-md p-2 rounded-full text-error hover:bg-error hover:text-white transition-all shadow-sm flex items-center justify-center border-none cursor-pointer"
-                      onClick={() => handleDeleteItem(item)}
-                    >
-                      <span className="material-symbols-outlined text-[20px]">delete</span>
-                    </button>
+
+                    {/* Delete button (Admin only) */}
+                    {isAdmin && (
+                      <button 
+                        className="absolute top-4 right-4 bg-white/80 backdrop-blur-md p-2 rounded-full text-error hover:bg-error hover:text-white transition-all shadow-sm flex items-center justify-center border-none cursor-pointer"
+                        onClick={() => handleDeleteItem(item)}
+                      >
+                        <span className="material-symbols-outlined text-[20px]">delete</span>
+                      </button>
+                    )}
                   </div>
 
                   <div className="p-lg flex-1 flex flex-col justify-between">
@@ -419,12 +493,17 @@ function MenuManager() {
                     </div>
 
                     <div className="mt-lg pt-md border-t border-outline-variant/10 flex items-center justify-between">
-                      <button 
-                        className="p-2 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant flex items-center justify-center border-none bg-transparent cursor-pointer"
-                        onClick={() => openEditModal(item)}
-                      >
-                        <span className="material-symbols-outlined text-[20px]">edit</span>
-                      </button>
+                      {/* Edit button (Admin only) */}
+                      {isAdmin ? (
+                        <button 
+                          className="p-2 rounded-full hover:bg-surface-container-high transition-colors text-on-surface-variant flex items-center justify-center border-none bg-transparent cursor-pointer"
+                          onClick={() => openEditModal(item)}
+                        >
+                          <span className="material-symbols-outlined text-[20px]">edit</span>
+                        </button>
+                      ) : (
+                        <div /> // Spacer
+                      )}
                       <span className="text-label-md font-medium text-on-surface-variant">
                         {item.availability ? "Available" : "Unavailable"}
                       </span>

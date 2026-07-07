@@ -192,10 +192,18 @@ GRANT EXECUTE ON FUNCTION public.admin_delete_chef(uuid) TO anon, authenticated;
 
 
 -- ============================================================
--- DONE — All functions created successfully.
--- The admin frontend will now be able to:
--- 1. Read all student wallet balances (get_all_student_balances)
--- 2. Read all chef profiles (get_all_chefs)
--- 3. Create chef accounts with correct role (fixed trigger)
--- 4. Delete chef profiles safely (admin_delete_chef)
+-- PART 7: Update menu table policies to allow both chefs and admins
 -- ============================================================
+DROP POLICY IF EXISTS "Only chefs can modify the menu" ON public.menu;
+CREATE POLICY "Chefs and admins can modify the menu" ON public.menu
+  FOR ALL USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid() AND profiles.role IN ('chef', 'admin')
+    )
+  );
+
+-- ============================================================
+-- DONE — All functions and policy updates created successfully.
+-- ============================================================
+

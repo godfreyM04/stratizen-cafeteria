@@ -217,6 +217,14 @@ function App() {
                   </ProtectedRoute>
                 }
               />
+              <Route
+                path="/admin/menu"
+                element={
+                  <ProtectedRoute allowedRole="admin">
+                    <MenuManager />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Root redirect */}
               <Route

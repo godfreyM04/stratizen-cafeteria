@@ -176,7 +176,7 @@ function AdminDashboard() {
             <span className="material-symbols-outlined">group</span>
             <span>User Management</span>
           </a>
-          <a className="ad-nav-item" style={{ cursor: "pointer" }} onClick={(e) => e.preventDefault()}>
+          <a className="ad-nav-item" style={{ cursor: "pointer" }} onClick={() => navigate("/admin/menu")}>
             <span className="material-symbols-outlined">restaurant_menu</span>
             <span>Menu Management</span>
           </a>
@@ -224,7 +224,7 @@ function AdminDashboard() {
                 <span className="material-symbols-outlined">group</span>
                 <span>User Management</span>
               </a>
-              <a className="ad-nav-item" href="#menu" onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); }}>
+              <a className="ad-nav-item" onClick={() => { navigate("/admin/menu"); setMobileMenuOpen(false); }}>
                 <span className="material-symbols-outlined">restaurant_menu</span>
                 <span>Menu Management</span>
               </a>

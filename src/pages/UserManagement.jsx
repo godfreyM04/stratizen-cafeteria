@@ -430,7 +430,7 @@ function UserManagement() {
             <span className="material-symbols-outlined font-fill">group</span>
             <span>User Management</span>
           </a>
-          <a className="um-nav-item" style={{ cursor: "pointer" }} onClick={(e) => e.preventDefault()}>
+          <a className="um-nav-item" style={{ cursor: "pointer" }} onClick={() => navigate("/admin/menu")}>
             <span className="material-symbols-outlined">restaurant_menu</span>
             <span>Menu Management</span>
           </a>
@@ -478,7 +478,7 @@ function UserManagement() {
                 <span className="material-symbols-outlined font-fill">group</span>
                 <span>User Management</span>
               </a>
-              <a className="um-nav-item" onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); }}>
+              <a className="um-nav-item" onClick={() => { navigate("/admin/menu"); setMobileMenuOpen(false); }}>
                 <span className="material-symbols-outlined">restaurant_menu</span>
                 <span>Menu Management</span>
               </a>
