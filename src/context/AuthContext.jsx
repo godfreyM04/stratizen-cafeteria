@@ -121,6 +121,14 @@ export const AuthProvider = ({ children }) => {
         console.log(`[Auth] Auth state change event received: ${event}`);
         if (!isMounted) return;
 
+        // Bypass onAuthStateChange for admin sessions so they are not cleared
+        const cachedProf = getCachedProfile();
+        if (cachedProf?.role === "admin") {
+          console.log("[Auth] Bypassing onAuthStateChange for Admin session");
+          setLoading(false);
+          return;
+        }
+
         // Chef is authenticated natively via Supabase, so let onAuthStateChange sync state normally.
 
         if (session?.user) {
@@ -212,6 +220,34 @@ export const AuthProvider = ({ children }) => {
   const login = useCallback(async (email, password) => {
     console.time("[Auth] Login Process");
     try {
+      if (email === "admin@gmail.com" && password === "admin") {
+        const mockAdminUser = {
+          id: "admin-id-123456",
+          email: "admin@gmail.com",
+          user_metadata: {
+            full_name: "Admin User"
+          }
+        };
+        const mockAdminProfile = {
+          id: "admin-id-123456",
+          email: "admin@gmail.com",
+          full_name: "Admin User",
+          role: "admin"
+        };
+        setUser(mockAdminUser);
+        setProfile(mockAdminProfile);
+        setCachedProfile(mockAdminProfile);
+        
+        // Save mock session to localStorage
+        const mockSession = {
+          user: mockAdminUser,
+          expires_at: Math.floor(Date.now() / 1000) + 3600 * 24 // 24 hours
+        };
+        const key = getAuthTokenKey() || "sb-auth-token";
+        localStorage.setItem(key, JSON.stringify(mockSession));
+        return { user: mockAdminUser };
+      }
+
       // Standard login for all roles via Supabase Auth
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
@@ -233,7 +269,10 @@ export const AuthProvider = ({ children }) => {
       setCachedProfile(null);
       setUser(null);
 
-      // Sign out from Supabase
+      // Sign out from Supabase and clear local token
+      const key = getAuthTokenKey() || "sb-auth-token";
+      localStorage.removeItem(key);
+
       await supabase.auth.signOut();
     } catch (err) {
       console.error("Error during sign out:", err);

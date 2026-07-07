@@ -23,6 +23,8 @@ import MenuManager from "./pages/MenuManager";
 import ChefNotifications from "./pages/ChefNotifications";
 import ProtectedRoute from "./components/ProtectedRoute";
 import PublicRoute from "./components/PublicRoute";
+import AdminLogin from "./pages/AdminLogin";
+import AdminDashboard from "./pages/AdminDashboard";
 import "./styles/Toast.css";
 import "./styles/QuantityCounter.css";
 
@@ -185,6 +187,24 @@ function App() {
                 element={
                   <ProtectedRoute allowedRole="chef">
                     <ChefNotifications />
+                  </ProtectedRoute>
+                }
+              />
+
+              {/* Admin routes */}
+              <Route
+                path="/admin/login"
+                element={
+                  <PublicRoute>
+                    <AdminLogin />
+                  </PublicRoute>
+                }
+              />
+              <Route
+                path="/admin/dashboard"
+                element={
+                  <ProtectedRoute allowedRole="admin">
+                    <AdminDashboard />
                   </ProtectedRoute>
                 }
               />

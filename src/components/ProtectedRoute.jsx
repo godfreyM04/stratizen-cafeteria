@@ -44,13 +44,21 @@ const ProtectedRoute = ({ children, allowedRole = "student" }) => {
   }
 
   const isChef = profile?.role === "chef" || user.email === "chef1@gmail.com";
+  const isAdmin = profile?.role === "admin" || user.email === "admin@gmail.com";
+
+  if (allowedRole === "admin" && !isAdmin) {
+    if (isChef) return <Navigate to="/chef/dashboard" replace />;
+    return <Navigate to="/admin/login" replace />;
+  }
 
   if (allowedRole === "chef" && !isChef) {
+    if (isAdmin) return <Navigate to="/admin/dashboard" replace />;
     return <Navigate to="/menu" replace />;
   }
 
-  if (allowedRole === "student" && isChef) {
-    return <Navigate to="/chef/dashboard" replace />;
+  if (allowedRole === "student") {
+    if (isChef) return <Navigate to="/chef/dashboard" replace />;
+    if (isAdmin) return <Navigate to="/admin/dashboard" replace />;
   }
 
   return children ? children : <Outlet />;

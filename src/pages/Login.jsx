@@ -57,6 +57,15 @@ function Login() {
       {/* Background Image overlay */}
       <div className="login-bg-image"></div>
 
+      {/* Admin button in top-right corner */}
+      <button 
+        className="login-admin-button" 
+        type="button" 
+        onClick={() => navigate("/admin/login")}
+      >
+        Admin
+      </button>
+
       <main className="login-wrapper">
         {/* Branding Section */}
         <div className="login-branding">

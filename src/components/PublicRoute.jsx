@@ -40,6 +40,18 @@ const PublicRoute = ({ children }) => {
   }
 
   if (user) {
+    const cachedProfileData = localStorage.getItem("stratizen_profile");
+    let role = "";
+    if (cachedProfileData) {
+      try {
+        role = JSON.parse(cachedProfileData)?.role || "";
+      } catch (e) {}
+    }
+    const isChef = role === "chef" || user.email === "chef1@gmail.com";
+    const isAdmin = role === "admin" || user.email === "admin@gmail.com";
+
+    if (isChef) return <Navigate to="/chef/dashboard" replace />;
+    if (isAdmin) return <Navigate to="/admin/dashboard" replace />;
     return <Navigate to="/menu" replace />;
   }
 

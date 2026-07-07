@@ -402,3 +402,41 @@ html.dark .login-card {
     padding: var(--spacing-md); /* Smaller padding on mobile */
   }
 }
+
+/* Admin button in top-right corner */
+.login-admin-button {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  background-color: #00288e;
+  color: #ffffff;
+  font-family: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 8px 16px;
+  border-radius: 8px; /* Medium border radius */
+  box-shadow: 0 4px 12px rgba(0, 40, 142, 0.2); /* Soft shadow */
+  border: none;
+  cursor: pointer;
+  z-index: 20;
+  transition: background-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.login-admin-button:hover {
+  background-color: #1e40af;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 40, 142, 0.3);
+}
+
+.login-admin-button:active {
+  transform: translateY(0);
+}
+
+@media (max-width: 480px) {
+  .login-admin-button {
+    top: 16px;
+    right: 16px;
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+}
