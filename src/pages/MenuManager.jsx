@@ -321,7 +321,7 @@ function MenuManager() {
               <span className="material-symbols-outlined">shopping_cart</span>
               <span>Orders</span>
             </a>
-            <a className="um-nav-item" style={{ cursor: "pointer" }} onClick={(e) => e.preventDefault()}>
+            <a className="um-nav-item" style={{ cursor: "pointer" }} onClick={() => navigate("/admin/reports")}>
               <span className="material-symbols-outlined">analytics</span>
               <span>Reports & Analytics</span>
             </a>

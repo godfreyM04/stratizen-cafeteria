@@ -160,7 +160,7 @@ function OrderManagement() {
             <span className="material-symbols-outlined font-fill">shopping_cart</span>
             <span>Orders</span>
           </a>
-          <a className="om-nav-item" style={{ cursor: "pointer" }} onClick={(e) => e.preventDefault()}>
+          <a className="om-nav-item" style={{ cursor: "pointer" }} onClick={() => navigate("/admin/reports")}>
             <span className="material-symbols-outlined">analytics</span>
             <span>Reports & Analytics</span>
           </a>
@@ -208,7 +208,7 @@ function OrderManagement() {
                 <span className="material-symbols-outlined font-fill">shopping_cart</span>
                 <span>Orders</span>
               </a>
-              <a className="om-nav-item" onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); }}>
+              <a className="om-nav-item" onClick={() => { navigate("/admin/reports"); setMobileMenuOpen(false); }}>
                 <span className="material-symbols-outlined">analytics</span>
                 <span>Reports & Analytics</span>
               </a>
@@ -231,10 +231,6 @@ function OrderManagement() {
               <span className="material-symbols-outlined">menu</span>
             </button>
             <h2 className="om-brand-title">Stratizen Cafeteria</h2>
-          </div>
-          <div className="om-search-container">
-            <span className="material-symbols-outlined om-search-icon">search</span>
-            <input className="om-search-input" placeholder="Search orders..." type="text" readOnly />
           </div>
           <div className="om-topbar-right" />
         </header>

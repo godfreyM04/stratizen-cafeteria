@@ -27,6 +27,7 @@ import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import UserManagement from "./pages/UserManagement";
 import OrderManagement from "./pages/OrderManagement";
+import ReportsAnalytics from "./pages/ReportsAnalytics";
 import "./styles/Toast.css";
 import "./styles/QuantityCounter.css";
 
@@ -231,6 +232,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRole="admin">
                     <OrderManagement />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/reports"
+                element={
+                  <ProtectedRoute allowedRole="admin">
+                    <ReportsAnalytics />
                   </ProtectedRoute>
                 }
               />

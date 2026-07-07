@@ -438,7 +438,7 @@ function UserManagement() {
             <span className="material-symbols-outlined">shopping_cart</span>
             <span>Orders</span>
           </a>
-          <a className="um-nav-item" style={{ cursor: "pointer" }} onClick={(e) => e.preventDefault()}>
+          <a className="um-nav-item" style={{ cursor: "pointer" }} onClick={() => navigate("/admin/reports")}>
             <span className="material-symbols-outlined">analytics</span>
             <span>Reports & Analytics</span>
           </a>
@@ -486,7 +486,7 @@ function UserManagement() {
                 <span className="material-symbols-outlined">shopping_cart</span>
                 <span>Orders</span>
               </a>
-              <a className="um-nav-item" onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); }}>
+              <a className="um-nav-item" onClick={() => { navigate("/admin/reports"); setMobileMenuOpen(false); }}>
                 <span className="material-symbols-outlined">analytics</span>
                 <span>Reports & Analytics</span>
               </a>
