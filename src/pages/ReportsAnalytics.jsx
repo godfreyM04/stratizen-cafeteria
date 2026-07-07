@@ -11,6 +11,16 @@ function formatKES(amount) {
   return "KES " + num.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Helper to generate initials from chef name
+function getChefInitials(name) {
+  if (!name) return "C";
+  const parts = name.trim().split(/\s+/);
+  if (parts.length >= 2) {
+    return (parts[0][0] + parts[1][0]).toUpperCase();
+  }
+  return parts[0].substring(0, 2).toUpperCase();
+}
+
 function ReportsAnalytics() {
   const { logout } = useAuth();
   const navigate = useNavigate();
@@ -395,12 +405,6 @@ function ReportsAnalytics() {
                   <p className="ra-card-subtitle">Aggregate completed revenue breakdown for weekdays.</p>
 
                   <div className="ra-chart-container">
-                    <div className="ra-chart-y-axis">
-                      <span>100%</span>
-                      <span>50%</span>
-                      <span>0%</span>
-                    </div>
-
                     <div className="ra-chart-bars-wrapper">
                       {weeklyTrendData.map((day) => (
                         <div key={day.name} className="ra-chart-col">
@@ -472,7 +476,9 @@ function ReportsAnalytics() {
                           <div key={chef.id} className="ra-ranking-item">
                             <div className="ra-ranking-info">
                               <div className="ra-rank-badge font-fill">{idx + 1}</div>
-                              <img className="ra-ranking-image rounded-avatar" src={chef.photo} alt={chef.name} />
+                              <div className="ra-avatar-initials">
+                                {getChefInitials(chef.name)}
+                              </div>
                               <span className="ra-ranking-name">{chef.name}</span>
                             </div>
                             <span className="ra-ranking-stat">{chef.completedCount} Completed</span>

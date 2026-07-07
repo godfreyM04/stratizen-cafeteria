@@ -134,12 +134,11 @@ function drawFooter(doc, pageNumber, pageCount) {
 // Main PDF Generator
 export async function generateExecutiveReport() {
   try {
-    // 1. Fetch completed orders with items and chefs
+    // 1. Fetch completed orders with items
     const { data: orders, error: ordersError } = await supabase
       .from("orders")
       .select(`
         *,
-        chef:profiles!orders_assigned_chef_id_fkey(full_name),
         order_items(
           quantity,
           menu(name, image_url)

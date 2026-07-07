@@ -48,13 +48,10 @@ function OrderManagement() {
   // Fetch orders from Supabase with joins
   const fetchOrders = useCallback(async () => {
     try {
-      // Fetch orders with chef name via profiles foreign key join
-      // and nested order items to display the list of ordered meals
-      const { data, error } = await supabase
+      const { data: ordersData, error: ordersErr } = await supabase
         .from("orders")
         .select(`
           *,
-          chef:profiles!orders_assigned_chef_id_fkey(full_name),
           order_items(
             quantity,
             menu(name)
@@ -62,9 +59,31 @@ function OrderManagement() {
         `)
         .order("created_at", { ascending: false });
 
-      if (error) throw error;
+      if (ordersErr) throw ordersErr;
 
-      setOrders(data || []);
+      // Extract unique chef IDs
+      const chefIds = [...new Set((ordersData || []).map(o => o.assigned_chef_id).filter(id => id))];
+
+      let chefMap = {};
+      if (chefIds.length > 0) {
+        const { data: chefsData, error: chefsErr } = await supabase
+          .from("profiles")
+          .select("id, full_name")
+          .in("id", chefIds);
+
+        if (!chefsErr && chefsData) {
+          chefsData.forEach(c => {
+            chefMap[c.id] = c;
+          });
+        }
+      }
+
+      const mappedOrders = (ordersData || []).map(o => ({
+        ...o,
+        chef: o.assigned_chef_id ? chefMap[o.assigned_chef_id] : null
+      }));
+
+      setOrders(mappedOrders);
     } catch (err) {
       console.error("[OM] Error fetching orders:", err);
     } finally {

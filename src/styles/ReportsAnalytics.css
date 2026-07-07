@@ -574,6 +574,21 @@
   border-radius: 50%;
 }
 
+.ra-avatar-initials {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background-color: var(--color-primary);
+  color: #ffffff;
+  font-family: var(--font-family-title);
+  font-size: 11px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-transform: uppercase;
+}
+
 .ra-ranking-name {
   font-size: 13px;
   font-weight: 500;
