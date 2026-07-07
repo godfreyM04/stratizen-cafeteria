@@ -26,6 +26,7 @@ import PublicRoute from "./components/PublicRoute";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
 import UserManagement from "./pages/UserManagement";
+import OrderManagement from "./pages/OrderManagement";
 import "./styles/Toast.css";
 import "./styles/QuantityCounter.css";
 
@@ -222,6 +223,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRole="admin">
                     <MenuManager />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/orders"
+                element={
+                  <ProtectedRoute allowedRole="admin">
+                    <OrderManagement />
                   </ProtectedRoute>
                 }
               />

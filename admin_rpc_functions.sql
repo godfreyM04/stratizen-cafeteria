@@ -204,6 +204,12 @@ CREATE POLICY "Chefs and admins can modify the menu" ON public.menu
   );
 
 -- ============================================================
+-- PART 8: Add assigned_chef_id to orders table
+-- ============================================================
+ALTER TABLE public.orders 
+  ADD COLUMN IF NOT EXISTS assigned_chef_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL;
+
+-- ============================================================
 -- DONE — All functions and policy updates created successfully.
 -- ============================================================
 

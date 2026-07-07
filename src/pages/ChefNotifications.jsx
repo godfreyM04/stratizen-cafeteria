@@ -98,7 +98,10 @@ export default function ChefNotifications() {
     try {
       const { error } = await supabase
         .from("orders")
-        .update({ status: "preparing" })
+        .update({ 
+          status: "preparing",
+          assigned_chef_id: profile?.id
+        })
         .eq("id", orderId);
 
       if (error) throw error;

@@ -42,7 +42,7 @@ const getElapsedTime = (placedAtString) => {
 };
 
 function PendingOrders() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
 
   const [orders, setOrders] = useState([]);
@@ -117,7 +117,8 @@ function PendingOrders() {
         .from("orders")
         .update({
           status: "preparing",
-          prep_started_at: new Date().toISOString()
+          prep_started_at: new Date().toISOString(),
+          assigned_chef_id: user?.id
         })
         .eq("id", orderId);
 

@@ -180,7 +180,7 @@ function AdminDashboard() {
             <span className="material-symbols-outlined">restaurant_menu</span>
             <span>Menu Management</span>
           </a>
-          <a className="ad-nav-item" style={{ cursor: "pointer" }} onClick={(e) => e.preventDefault()}>
+          <a className="ad-nav-item" style={{ cursor: "pointer" }} onClick={() => navigate("/admin/orders")}>
             <span className="material-symbols-outlined">shopping_cart</span>
             <span>Orders</span>
           </a>
@@ -228,7 +228,7 @@ function AdminDashboard() {
                 <span className="material-symbols-outlined">restaurant_menu</span>
                 <span>Menu Management</span>
               </a>
-              <a className="ad-nav-item" href="#orders" onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); }}>
+              <a className="ad-nav-item" onClick={() => { navigate("/admin/orders"); setMobileMenuOpen(false); }}>
                 <span className="material-symbols-outlined">shopping_cart</span>
                 <span>Orders</span>
               </a>

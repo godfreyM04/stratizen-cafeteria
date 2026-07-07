@@ -23,7 +23,7 @@ const padCount = (n) => (n < 10 ? `0${n}` : String(n));
 /* ── Component ─────────────────────────────────────────────── */
 
 function ChefDashboard() {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
   const navigate = useNavigate();
 
   /* State */
@@ -150,6 +150,7 @@ function ChefDashboard() {
         .update({
           status: "preparing",
           prep_started_at: new Date().toISOString(),
+          assigned_chef_id: user?.id
         })
         .eq("id", orderId);
       if (error) throw error;
