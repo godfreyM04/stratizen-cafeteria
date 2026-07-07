@@ -25,6 +25,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import PublicRoute from "./components/PublicRoute";
 import AdminLogin from "./pages/AdminLogin";
 import AdminDashboard from "./pages/AdminDashboard";
+import UserManagement from "./pages/UserManagement";
 import "./styles/Toast.css";
 import "./styles/QuantityCounter.css";
 
@@ -205,6 +206,14 @@ function App() {
                 element={
                   <ProtectedRoute allowedRole="admin">
                     <AdminDashboard />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/users"
+                element={
+                  <ProtectedRoute allowedRole="admin">
+                    <UserManagement />
                   </ProtectedRoute>
                 }
               />

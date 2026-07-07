@@ -133,13 +133,25 @@ export const AuthProvider = ({ children }) => {
 
         if (session?.user) {
           const currentUserId = session.user.id;
+          const userProfile = await fetchProfile(currentUserId);
+          
+          if (userProfile && userProfile.phone_number === "suspended") {
+            console.log("[Auth] Session active but student is suspended. Logging out...");
+            loadedUserId = null;
+            setUser(null);
+            setProfile(null);
+            setCachedProfile(null);
+            await supabase.auth.signOut();
+            setLoading(false);
+            return;
+          }
+
           setUser(session.user);
 
           // Only fetch/refresh profile if the user changed, or if we don't have it in the ref yet
           if (loadedUserId !== currentUserId || !profileRef.current) {
             loadedUserId = currentUserId;
-            const userProfile = await fetchProfile(currentUserId);
-            if (isMounted && loadedUserId === currentUserId) {
+            if (isMounted) {
               setProfile(userProfile);
               setCachedProfile(userProfile);
             }
@@ -254,6 +266,20 @@ export const AuthProvider = ({ children }) => {
         password,
       });
       if (error) throw error;
+
+      if (data?.user) {
+        const { data: prof, error: profErr } = await supabase
+          .from("profiles")
+          .select("*")
+          .eq("id", data.user.id)
+          .maybeSingle();
+
+        if (prof && prof.phone_number === "suspended") {
+          await supabase.auth.signOut();
+          throw new Error("Your account has been suspended. Please contact administration.");
+        }
+      }
+
       return data;
     } finally {
       console.timeEnd("[Auth] Login Process");

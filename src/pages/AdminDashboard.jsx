@@ -168,23 +168,23 @@ function AdminDashboard() {
         </div>
 
         <nav className="ad-nav-menu">
-          <a className="ad-nav-item active" href="#dashboard">
+          <a className="ad-nav-item active" style={{ cursor: "pointer" }} onClick={() => navigate("/admin/dashboard")}>
             <span className="material-symbols-outlined font-fill">dashboard</span>
             <span>Dashboard</span>
           </a>
-          <a className="ad-nav-item" href="#users" onClick={(e) => e.preventDefault()}>
+          <a className="ad-nav-item" style={{ cursor: "pointer" }} onClick={() => navigate("/admin/users")}>
             <span className="material-symbols-outlined">group</span>
             <span>User Management</span>
           </a>
-          <a className="ad-nav-item" href="#menu" onClick={(e) => e.preventDefault()}>
+          <a className="ad-nav-item" style={{ cursor: "pointer" }} onClick={(e) => e.preventDefault()}>
             <span className="material-symbols-outlined">restaurant_menu</span>
             <span>Menu Management</span>
           </a>
-          <a className="ad-nav-item" href="#orders" onClick={(e) => e.preventDefault()}>
+          <a className="ad-nav-item" style={{ cursor: "pointer" }} onClick={(e) => e.preventDefault()}>
             <span className="material-symbols-outlined">shopping_cart</span>
             <span>Orders</span>
           </a>
-          <a className="ad-nav-item" href="#analytics" onClick={(e) => e.preventDefault()}>
+          <a className="ad-nav-item" style={{ cursor: "pointer" }} onClick={(e) => e.preventDefault()}>
             <span className="material-symbols-outlined">analytics</span>
             <span>Reports & Analytics</span>
           </a>
@@ -216,11 +216,11 @@ function AdminDashboard() {
               </div>
             </div>
             <nav className="ad-nav-menu">
-              <a className="ad-nav-item active" href="#dashboard" onClick={() => setMobileMenuOpen(false)}>
+              <a className="ad-nav-item active" onClick={() => { navigate("/admin/dashboard"); setMobileMenuOpen(false); }}>
                 <span className="material-symbols-outlined font-fill">dashboard</span>
                 <span>Dashboard</span>
               </a>
-              <a className="ad-nav-item" href="#users" onClick={(e) => { e.preventDefault(); setMobileMenuOpen(false); }}>
+              <a className="ad-nav-item" onClick={() => { navigate("/admin/users"); setMobileMenuOpen(false); }}>
                 <span className="material-symbols-outlined">group</span>
                 <span>User Management</span>
               </a>
@@ -269,19 +269,7 @@ function AdminDashboard() {
           </div>
 
           <div className="ad-topbar-right">
-            <button className="ad-icon-btn">
-              <span className="material-symbols-outlined">notifications</span>
-            </button>
-            <button className="ad-icon-btn">
-              <span className="material-symbols-outlined">settings</span>
-            </button>
-            <div className="ad-profile-mini">
-              <img
-                alt="Admin Profile"
-                className="ad-profile-mini-img"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBxhNDVwDlKnCqK22qnnXgHL_YtjvXj3rn04Efc5Uq3YudBm4nVjgnm8LfUG1WqIO62uzXRIaXG6fvH__S-GhepeG2k78dlnQwxubHfHIjERQ-zDxIJMwW1Jwo4mL5pr07x--y8uLLhg2GuW-fRSXA_JWqso_w39FVEkwXh7fR2JNoENSp5hK93r-wbVuXG7Nju7uMkrLC_6b_NY7I65wR1iNoifkr3ZJ1v0qUa-gt_QN3qMEcaaSI"
-              />
-            </div>
+            {/* Notifications, Settings, and Profile Avatar removed as per Part 1 UI Refinements */}
           </div>
         </header>
 
@@ -350,13 +338,16 @@ function AdminDashboard() {
             {/* Revenue Today */}
             <div className="ad-kpi-card ad-kpi-highlighted bg-primary">
               <div className="ad-kpi-card-header">
-                <span className="ad-kpi-label text-primary-fixed">Revenue Today</span>
+                <span className="ad-kpi-label text-white" style={{ color: '#ffffff' }}>Revenue Today</span>
                 <div className="ad-kpi-icon-container bg-on-primary-20 text-on-primary">
-                  <span className="material-symbols-outlined text-sm">payments</span>
+                  <span className="material-symbols-outlined text-sm text-white" style={{ color: '#ffffff' }}>payments</span>
                 </div>
               </div>
               <div className="ad-kpi-value-container">
-                <div className="ad-kpi-value text-white">KES {stats.revenue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+                <div className="ad-kpi-value text-white" style={{ color: '#ffffff' }}>
+                  <span style={{ color: '#ffffff' }}>KES </span>
+                  <span style={{ color: '#ffffff' }}>{stats.revenue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -367,7 +358,6 @@ function AdminDashboard() {
               <div className="ad-chart-header">
                 <h3 className="ad-chart-title">Orders Over Time</h3>
                 <div className="ad-chart-toggle-group">
-                  <span className="ad-chart-tab">Day</span>
                   <span className="ad-chart-tab active">Week</span>
                 </div>
               </div>
