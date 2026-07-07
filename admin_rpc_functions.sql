@@ -210,6 +210,94 @@ ALTER TABLE public.orders
   ADD COLUMN IF NOT EXISTS assigned_chef_id uuid REFERENCES public.profiles(id) ON DELETE SET NULL;
 
 -- ============================================================
+-- PART 9: RLS Select Policies for Admins
+-- ============================================================
+DROP POLICY IF EXISTS "Admins can view all orders" ON public.orders;
+CREATE POLICY "Admins can view all orders" ON public.orders
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
+    )
+  );
+
+DROP POLICY IF EXISTS "Admins can view all order items" ON public.order_items;
+CREATE POLICY "Admins can view all order items" ON public.order_items
+  FOR SELECT USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
+    )
+  );
+
+-- ============================================================
+-- PART 10: Security Definer RPCs to bypass RLS for Admins
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.admin_get_all_orders()
+RETURNS TABLE (
+  id uuid,
+  user_id uuid,
+  student_name text,
+  student_id text,
+  pickup_option text,
+  status text,
+  total_items integer,
+  subtotal numeric,
+  total numeric,
+  wallet_deduction numeric,
+  notes text,
+  prep_started_at timestamp with time zone,
+  ready_at timestamp with time zone,
+  collected_at timestamp with time zone,
+  created_at timestamp with time zone,
+  updated_at timestamp with time zone,
+  assigned_chef_id uuid
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY 
+  SELECT 
+    o.id, o.user_id, o.student_name, o.student_id, o.pickup_option, o.status,
+    o.total_items, o.subtotal, o.total, o.wallet_deduction, o.notes,
+    o.prep_started_at, o.ready_at, o.collected_at, o.created_at, o.updated_at,
+    NULL::uuid as assigned_chef_id
+  FROM public.orders o
+  ORDER BY o.created_at DESC;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_get_all_orders() TO anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.admin_get_all_order_items()
+RETURNS TABLE (
+  id uuid,
+  order_id uuid,
+  menu_item_id uuid,
+  quantity integer,
+  unit_price numeric,
+  subtotal numeric,
+  menu_name text
+)
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  RETURN QUERY 
+  SELECT 
+    oi.id, oi.order_id, oi.menu_item_id, oi.quantity, oi.unit_price, oi.subtotal,
+    m.name as menu_name
+  FROM public.order_items oi
+  LEFT JOIN public.menu m ON m.id = oi.menu_item_id;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_get_all_order_items() TO anon, authenticated;
+
+-- ============================================================
 -- DONE — All functions and policy updates created successfully.
 -- ============================================================
 

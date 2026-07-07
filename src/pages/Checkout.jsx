@@ -236,65 +236,7 @@ function Checkout() {
         return;
       }
 
-      // 2. Verify wallet balance if paying via wallet
-      if (paymentMethod === "wallet" && walletBalance < total) {
-        setShowInsufficientBalanceModal(true);
-        setLoading(false);
-        return;
-      }
-
-      // 3. Prepare order items JSON
-      const itemsJson = trayItems.map(item => ({
-        menu_item_id: item.id,
-        quantity: item.quantity,
-        unit_price: item.price,
-        subtotal: item.price * item.quantity
-      }));
-
-      // Log the payload details before calling Supabase
-      console.log("[Checkout] Order payload validated. Submitting place_order RPC with:", {
-        p_user_id: user.id,
-        p_student_name: profile?.full_name || "Student",
-        p_student_id: profile?.student_number || "",
-        p_pickup_option: pickupLocation === "counter_a" ? "dine_in" : "takeaway",
-        p_total_items: trayItems.reduce((sum, i) => sum + i.quantity, 0),
-        p_subtotal: subtotal,
-        p_total: total,
-        p_items: itemsJson
-      });
-
-      // 4. Call the atomic place_order RPC
-      const { data: newOrderId, error: rpcError } = await supabase.rpc("place_order", {
-        p_user_id: user.id,
-        p_student_name: profile?.full_name || "Student",
-        p_student_id: profile?.student_number || "",
-        p_pickup_option: pickupLocation === "counter_a" ? "dine_in" : "takeaway",
-        p_total_items: trayItems.reduce((sum, i) => sum + i.quantity, 0),
-        p_subtotal: subtotal,
-        p_total: total,
-        p_notes: "",
-        p_items: itemsJson
-      });
-
-      if (rpcError) {
-        console.error("[Checkout] place_order RPC execution failed:", {
-          code: rpcError.code,
-          message: rpcError.message,
-          details: rpcError.details
-        });
-
-        if (rpcError.message.includes("INSUFFICIENT_BALANCE")) {
-          setShowInsufficientBalanceModal(true);
-        } else if (rpcError.message.includes("ACTIVE_ORDER_EXISTS")) {
-          setShowActiveOrderErrorModal(true);
-        } else {
-          alert(`Failed to place your order: ${rpcError.message || rpcError.code}`);
-        }
-        setLoading(false);
-        return;
-      }
-
-      // 5. Build active order object for frontend state synchronization
+      let finalOrderId;
       const placedDate = new Date();
       const estMinutes = pickupLocation === "counter_a" ? 15 : 10;
       const estDate = new Date(placedDate.getTime() + estMinutes * 60000);
@@ -314,26 +256,144 @@ function Checkout() {
       placedHours = placedHours ? placedHours : 12;
       const placedFormatted = `${dateStr} at ${placedHours}:${placedMins} ${placedAmpm}`;
 
-      const activeOrderObj = {
-        id: newOrderId,
-        placedAt: placedDate.toISOString(),
-        placedFormatted: placedFormatted,
-        estimatedTime: estimatedTime,
-        pickupLocation: pickupLocation === "counter_a" ? "Pickup Counter A" : "Pickup Counter B",
-        paymentMethod: paymentMethod === "wallet" ? "University Wallet" : "Mobile Money",
-        items: [...trayItems],
-        subtotal: subtotal,
-        tax: tax,
-        total: total,
-        status: "pending"
-      };
+      if (paymentMethod === "mobile") {
+        // A. Direct insert for Mobile Money
+        const { data: orderData, error: orderErr } = await supabase
+          .from("orders")
+          .insert({
+            user_id: user.id,
+            student_name: profile?.full_name || "Student",
+            student_id: profile?.student_number || "",
+            pickup_option: pickupLocation === "counter_a" ? "dine_in" : "takeaway",
+            status: "pending",
+            total_items: trayItems.reduce((sum, i) => sum + i.quantity, 0),
+            subtotal: subtotal,
+            total: total,
+            wallet_deduction: 0.00,
+            notes: ""
+          })
+          .select("id")
+          .single();
 
-      // Save active order to localStorage for tracking/navigation sync
-      localStorage.setItem("stratizen_active_order", JSON.stringify(activeOrderObj));
+        if (orderErr) throw orderErr;
+        finalOrderId = orderData.id;
 
-      addToast(`Order placed successfully! KES ${formatKES(total)} paid via University Wallet.`);
-      clearTray();
-      setShowSuccessOverlay(true);
+        // B. Insert order items
+        const orderItemsPayload = trayItems.map(item => ({
+          order_id: finalOrderId,
+          menu_item_id: item.id,
+          quantity: item.quantity,
+          unit_price: item.price,
+          subtotal: item.price * item.quantity
+        }));
+
+        const { error: itemsErr } = await supabase
+          .from("order_items")
+          .insert(orderItemsPayload);
+
+        if (itemsErr) throw itemsErr;
+
+        const activeOrderObj = {
+          id: finalOrderId,
+          placedAt: placedDate.toISOString(),
+          placedFormatted: placedFormatted,
+          estimatedTime: estimatedTime,
+          pickupLocation: pickupLocation === "counter_a" ? "Pickup Counter A" : "Pickup Counter B",
+          paymentMethod: "Mobile Money",
+          items: [...trayItems],
+          subtotal: subtotal,
+          tax: tax,
+          total: total,
+          status: "pending"
+        };
+
+        localStorage.setItem("stratizen_active_order", JSON.stringify(activeOrderObj));
+
+        addToast(`Order placed successfully! KES ${formatKES(total)} paid via Mobile Money.`);
+        clearTray();
+        setShowSuccessOverlay(true);
+
+        // Auto redirect to tracking page after 2.5 seconds
+        setTimeout(() => {
+          setShowSuccessOverlay(false);
+          navigate("/order-tracking");
+        }, 2500);
+
+      } else {
+        // 2. Verify wallet balance if paying via wallet
+        if (walletBalance < total) {
+          setShowInsufficientBalanceModal(true);
+          setLoading(false);
+          return;
+        }
+
+        // 3. Prepare order items JSON
+        const itemsJson = trayItems.map(item => ({
+          menu_item_id: item.id,
+          quantity: item.quantity,
+          unit_price: item.price,
+          subtotal: item.price * item.quantity
+        }));
+
+        // 4. Call the atomic place_order RPC
+        const { data: newOrderId, error: rpcError } = await supabase.rpc("place_order", {
+          p_user_id: user.id,
+          p_student_name: profile?.full_name || "Student",
+          p_student_id: profile?.student_number || "",
+          p_pickup_option: pickupLocation === "counter_a" ? "dine_in" : "takeaway",
+          p_total_items: trayItems.reduce((sum, i) => sum + i.quantity, 0),
+          p_subtotal: subtotal,
+          p_total: total,
+          p_notes: "",
+          p_items: itemsJson
+        });
+
+        if (rpcError) {
+          console.error("[Checkout] place_order RPC execution failed:", {
+            code: rpcError.code,
+            message: rpcError.message,
+            details: rpcError.details
+          });
+
+          if (rpcError.message.includes("INSUFFICIENT_BALANCE")) {
+            setShowInsufficientBalanceModal(true);
+          } else if (rpcError.message.includes("ACTIVE_ORDER_EXISTS")) {
+            setShowActiveOrderErrorModal(true);
+          } else {
+            alert(`Failed to place your order: ${rpcError.message || rpcError.code}`);
+          }
+          setLoading(false);
+          return;
+        }
+
+        finalOrderId = newOrderId;
+
+        const activeOrderObj = {
+          id: finalOrderId,
+          placedAt: placedDate.toISOString(),
+          placedFormatted: placedFormatted,
+          estimatedTime: estimatedTime,
+          pickupLocation: pickupLocation === "counter_a" ? "Pickup Counter A" : "Pickup Counter B",
+          paymentMethod: "University Wallet",
+          items: [...trayItems],
+          subtotal: subtotal,
+          tax: tax,
+          total: total,
+          status: "pending"
+        };
+
+        localStorage.setItem("stratizen_active_order", JSON.stringify(activeOrderObj));
+
+        addToast(`Order placed successfully! KES ${formatKES(total)} paid via University Wallet.`);
+        clearTray();
+        setShowSuccessOverlay(true);
+
+        // Auto redirect to tracking page after 2.5 seconds
+        setTimeout(() => {
+          setShowSuccessOverlay(false);
+          navigate("/order-tracking");
+        }, 2500);
+      }
     } catch (err) {
       console.error("Checkout error:", err.message);
       alert("Failed to place your order: " + err.message);

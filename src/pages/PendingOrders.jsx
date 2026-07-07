@@ -122,7 +122,22 @@ function PendingOrders() {
         })
         .eq("id", orderId);
 
-      if (error) throw error;
+      if (error) {
+        const currentOrder = orders.find(o => o.id === orderId);
+        const existingNotes = currentOrder?.notes || "";
+        const updatedNotes = `ChefID:${user?.id}` + (existingNotes ? ` | ${existingNotes}` : "");
+
+        const { error: fallbackError } = await supabase
+          .from("orders")
+          .update({
+            status: "preparing",
+            prep_started_at: new Date().toISOString(),
+            notes: updatedNotes
+          })
+          .eq("id", orderId);
+
+        if (fallbackError) throw fallbackError;
+      }
 
       setOrders(prev => prev.filter(o => o.id !== orderId));
     } catch (err) {

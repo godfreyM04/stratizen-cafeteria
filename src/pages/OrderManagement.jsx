@@ -48,21 +48,44 @@ function OrderManagement() {
   // Fetch orders from Supabase with joins
   const fetchOrders = useCallback(async () => {
     try {
+      // 1. Fetch completed orders via RPC
       const { data: ordersData, error: ordersErr } = await supabase
-        .from("orders")
-        .select(`
-          *,
-          order_items(
-            quantity,
-            menu(name)
-          )
-        `)
-        .order("created_at", { ascending: false });
-
+        .rpc("admin_get_all_orders");
       if (ordersErr) throw ordersErr;
 
-      // Extract unique chef IDs
-      const chefIds = [...new Set((ordersData || []).map(o => o.assigned_chef_id).filter(id => id))];
+      // 2. Fetch order items via RPC
+      let itemsData = [];
+      const { data: rpcItemsData, error: itemsErr } = await supabase
+        .rpc("admin_get_all_order_items");
+      if (!itemsErr && rpcItemsData) {
+        itemsData = rpcItemsData;
+      } else {
+        console.warn("[OM] RPC admin_get_all_order_items failed, using empty array fallback:", itemsErr);
+      }
+
+      // Group items by order_id
+      const itemsMap = {};
+      itemsData.forEach(item => {
+        if (!itemsMap[item.order_id]) {
+          itemsMap[item.order_id] = [];
+        }
+        itemsMap[item.order_id].push({
+          quantity: item.quantity,
+          menu: {
+            name: item.menu_name || "Meal"
+          }
+        });
+      });
+
+      // Extract unique chef IDs (supporting both assigned_chef_id column and notes fallback)
+      const chefIds = [...new Set((ordersData || []).map(o => {
+        if (o.assigned_chef_id) return o.assigned_chef_id;
+        if (o.notes) {
+          const match = o.notes.match(/ChefID:([a-f0-9-]+)/);
+          if (match) return match[1];
+        }
+        return null;
+      }).filter(id => id))];
 
       let chefMap = {};
       if (chefIds.length > 0) {
@@ -78,10 +101,19 @@ function OrderManagement() {
         }
       }
 
-      const mappedOrders = (ordersData || []).map(o => ({
-        ...o,
-        chef: o.assigned_chef_id ? chefMap[o.assigned_chef_id] : null
-      }));
+      const mappedOrders = (ordersData || []).map(o => {
+        let chefId = o.assigned_chef_id;
+        if (!chefId && o.notes) {
+          const match = o.notes.match(/ChefID:([a-f0-9-]+)/);
+          if (match) chefId = match[1];
+        }
+        return {
+          ...o,
+          chef: chefId ? chefMap[chefId] : null,
+          notes: o.notes ? o.notes.replace(/ChefID:[a-f0-9-]+\s*\|?\s*/g, "").trim() : "",
+          order_items: itemsMap[o.id] || []
+        };
+      });
 
       setOrders(mappedOrders);
     } catch (err) {
@@ -313,8 +345,8 @@ function OrderManagement() {
             </div>
           </div>
 
-          {/* Orders Table Container */}
-          <div className="om-content-card">
+          {/* Orders Cards Grid Container */}
+          <div className="om-content-card" style={{ padding: "0" }}>
             {loading ? (
               <div className="om-loading-state">
                 <div className="om-spinner" />
@@ -322,86 +354,94 @@ function OrderManagement() {
               </div>
             ) : (
               <>
-                <div className="om-table-container">
-                  <table className="om-table">
-                    <thead className="om-table-head">
-                      <tr>
-                        <th>Order ID</th>
-                        <th>Student Name</th>
-                        <th>Date & Time</th>
-                        <th>Payment Method</th>
-                        <th>Items Ordered</th>
-                        <th>Assigned Chef</th>
-                        <th>Total Amount</th>
-                        <th style={{ textAlign: "right" }}>Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {filteredOrders.length === 0 ? (
-                        <tr>
-                          <td colSpan="8" className="om-empty-row">
-                            {searchQuery || paymentFilter !== "All" || statusFilter !== "All Orders"
-                              ? "No orders match your filter criteria."
-                              : "No orders have been placed today."}
-                          </td>
-                        </tr>
-                      ) : (
-                        filteredOrders.map((order) => {
-                          const paymentMethod = parseFloat(order.wallet_deduction) > 0 ? "Wallet" : "Mobile Money";
-                          const displayId = `STR-${order.id.substring(0, 8).toUpperCase()}`;
-                          const itemsOrdered = (order.order_items || [])
-                            .map((oi) => `${oi.quantity}x ${oi.menu?.name || "Meal"}`)
-                            .join(", ");
+                {filteredOrders.length === 0 ? (
+                  <div className="om-loading-state">
+                    <span className="material-symbols-outlined" style={{ fontSize: "48px", opacity: "0.5" }}>shopping_cart</span>
+                    <p style={{ fontStyle: "italic" }}>
+                      {searchQuery || paymentFilter !== "All" || statusFilter !== "All Orders"
+                        ? "No orders match your filter criteria."
+                        : "No orders have been placed today."}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="om-cards-grid">
+                    {filteredOrders.map((order) => {
+                      const paymentMethod = parseFloat(order.wallet_deduction) > 0 ? "Wallet" : "Mobile Money";
+                      const displayId = `STR-${order.id.substring(0, 8).toUpperCase()}`;
+                      const itemsOrdered = (order.order_items || [])
+                        .map((oi) => `${oi.quantity}x ${oi.menu?.name || "Meal"}`)
+                        .join(", ");
 
-                          let statusLabel = "Pending";
-                          let statusClass = "pending";
-                          if (order.status === "preparing") {
-                            statusLabel = "Preparing";
-                            statusClass = "preparing";
-                          } else if (order.status === "ready") {
-                            statusLabel = "Ready";
-                            statusClass = "ready";
-                          } else if (order.status === "collected") {
-                            statusLabel = "Completed";
-                            statusClass = "completed";
-                          }
+                      let statusLabel = "Pending";
+                      let statusClass = "pending";
+                      if (order.status === "preparing") {
+                        statusLabel = "Preparing";
+                        statusClass = "preparing";
+                      } else if (order.status === "ready") {
+                        statusLabel = "Ready";
+                        statusClass = "ready";
+                      } else if (order.status === "collected" || order.status === "completed") {
+                        statusLabel = "Completed";
+                        statusClass = "completed";
+                      }
 
-                          return (
-                            <tr key={order.id} className="om-table-row">
-                              <td className="bold-text color-primary">{displayId}</td>
-                              <td className="bold-text">{order.student_name}</td>
-                              <td className="sub-text">{formatDate(order.created_at)}</td>
-                              <td>
+                      return (
+                        <div key={order.id} className="om-order-card">
+                          <div className="om-card-header">
+                            <span className="om-card-id">{displayId}</span>
+                            <span className={`om-status-pill ${statusClass}`}>{statusLabel}</span>
+                          </div>
+                          
+                          <div className="om-card-body">
+                            <div className="om-info-row">
+                              <span className="material-symbols-outlined om-info-icon">person</span>
+                              <span className="om-info-value bold">{order.student_name}</span>
+                            </div>
+                            
+                            <div className="om-info-row">
+                              <span className="material-symbols-outlined om-info-icon">schedule</span>
+                              <span className="om-info-value">{formatDate(order.created_at)}</span>
+                            </div>
+                            
+                            <div className="om-info-row">
+                              <span className="material-symbols-outlined om-info-icon">payments</span>
+                              <span className="om-info-value">
                                 <span className={`om-payment-pill ${paymentMethod.toLowerCase().replace(" ", "-")}`}>
                                   {paymentMethod}
                                 </span>
-                              </td>
-                              <td className="sub-text om-items-cell" title={itemsOrdered}>
+                              </span>
+                            </div>
+                            
+                            <div className="om-info-row">
+                              <span className="material-symbols-outlined om-info-icon">restaurant_menu</span>
+                              <span className="om-info-value om-items-text" title={itemsOrdered}>
                                 {itemsOrdered || "—"}
-                              </td>
-                              <td className="bold-text chef-name-cell">
+                              </span>
+                            </div>
+                            
+                            <div className="om-info-row">
+                              <span className="material-symbols-outlined om-info-icon">restaurant</span>
+                              <span className="om-info-value">
                                 {order.chef?.full_name ? (
-                                  <div className="om-chef-badge">
-                                    <span className="material-symbols-outlined">restaurant</span>
-                                    <span>{order.chef.full_name}</span>
-                                  </div>
+                                  <span className="om-chef-badge" style={{ padding: "2px 8px" }}>
+                                    {order.chef.full_name}
+                                  </span>
                                 ) : (
                                   <span className="om-unassigned">Unassigned</span>
                                 )}
-                              </td>
-                              <td className="bold-text">{formatKES(order.total)}</td>
-                              <td style={{ textAlign: "right" }}>
-                                <span className={`om-status-pill ${statusClass}`}>
-                                  {statusLabel}
-                                </span>
-                              </td>
-                            </tr>
-                          );
-                        })
-                      )}
-                    </tbody>
-                  </table>
-                </div>
+                              </span>
+                            </div>
+                          </div>
+                          
+                          <div className="om-card-footer">
+                            <span className="om-total-label">Total Amount</span>
+                            <span className="om-total-value">{formatKES(order.total)}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
 
                 <div className="om-table-footer">
                   Showing {filteredOrders.length} of {orders.length} orders

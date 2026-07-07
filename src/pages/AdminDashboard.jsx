@@ -15,6 +15,8 @@ function AdminDashboard() {
   const [chefsCount, setChefsCount] = useState(0);
   const [ordersToday, setOrdersToday] = useState([]);
   const [weeklyOrders, setWeeklyOrders] = useState([]);
+  const [totalActive, setTotalActive] = useState(0);
+  const [totalCompleted, setTotalCompleted] = useState(0);
 
   // Fetch stats dynamically
   const fetchStats = async () => {
@@ -35,26 +37,45 @@ function AdminDashboard() {
       if (cError) throw cError;
       setChefsCount(cCount || 0);
 
-      // 3. Fetch Orders today
-      const todayStart = new Date();
-      todayStart.setHours(0, 0, 0, 0);
-      const { data: oToday, error: oError } = await supabase
-        .from("orders")
-        .select("*")
-        .gte("created_at", todayStart.toISOString());
+      // 3. Fetch all orders using SECURITY DEFINER RPC to bypass RLS
+      const { data: allOrders, error: oError } = await supabase
+        .rpc("admin_get_all_orders");
       if (oError) throw oError;
-      setOrdersToday(oToday || []);
 
-      // 4. Fetch Weekly orders (for weekly trends graph)
+      const ordersList = allOrders || [];
+
+      // Filter orders placed today in local system timezone
+      const now = new Date();
+      const localYear = now.getFullYear();
+      const localMonth = now.getMonth();
+      const localDate = now.getDate();
+
+      const oToday = ordersList.filter(o => {
+        const orderDate = new Date(o.created_at);
+        return orderDate.getFullYear() === localYear &&
+               orderDate.getMonth() === localMonth &&
+               orderDate.getDate() === localDate;
+      });
+      setOrdersToday(oToday);
+
+      // Weekly orders (placed in the last 7 days)
       const sevenDaysAgo = new Date();
       sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
       sevenDaysAgo.setHours(0, 0, 0, 0);
-      const { data: oWeekly, error: wError } = await supabase
-        .from("orders")
-        .select("created_at")
-        .gte("created_at", sevenDaysAgo.toISOString());
-      if (wError) throw wError;
-      setWeeklyOrders(oWeekly || []);
+
+      const oWeekly = ordersList.filter(o => {
+        const orderDate = new Date(o.created_at);
+        return orderDate >= sevenDaysAgo;
+      });
+      setWeeklyOrders(oWeekly);
+
+      // Count total active orders in entire database
+      const activeCount = ordersList.filter(o => ["pending", "preparing", "ready"].includes(o.status)).length;
+      setTotalActive(activeCount);
+
+      // Count total completed orders in entire database
+      const completedCount = ordersList.filter(o => o.status === "collected").length;
+      setTotalCompleted(completedCount);
 
     } catch (err) {
       console.error("Error fetching admin stats:", err);
@@ -96,15 +117,12 @@ function AdminDashboard() {
   // Memoized metrics calculations
   const stats = useMemo(() => {
     const total = ordersToday.length;
-    const active = ordersToday.filter(o => ["pending", "preparing", "ready"].includes(o.status)).length;
-    const completed = ordersToday.filter(o => o.status === "collected").length;
-    
-    // Revenue today is completed collected orders' sum
+    // Revenue today is completed (collected) orders placed today
     const revenue = ordersToday
       .filter(o => o.status === "collected")
-      .reduce((sum, o) => sum + parseFloat(o.total || o.total_price || 0), 0);
+      .reduce((sum, o) => sum + parseFloat(o.total || 0), 0);
 
-    return { total, active, completed, revenue };
+    return { total, revenue };
   }, [ordersToday]);
 
   // Memoized weekly trends bar heights
@@ -145,9 +163,9 @@ function AdminDashboard() {
     );
   }
 
-  // Ratio of completed to total orders (for mini progress bar)
-  const completedPct = stats.total > 0 ? (stats.completed / stats.total) * 100 : 100;
-  const activePct = stats.total > 0 ? (stats.active / stats.total) * 100 : 0;
+  // Ratio of completed to total active/completed orders across the database
+  const completedPct = totalCompleted + totalActive > 0 ? (totalCompleted / (totalCompleted + totalActive)) * 100 : 100;
+  const activePct = totalCompleted + totalActive > 0 ? (totalActive / (totalCompleted + totalActive)) * 100 : 0;
 
   return (
     <div className="ad-app-container">
@@ -258,15 +276,7 @@ function AdminDashboard() {
             <div className="ad-brand-title">Stratizen Cafeteria</div>
           </div>
 
-          {/* Search Bar */}
-          <div className="ad-search-container">
-            <span className="material-symbols-outlined ad-search-icon">search</span>
-            <input
-              className="ad-search-input"
-              placeholder="Search orders, menus, or users..."
-              type="text"
-            />
-          </div>
+
 
           <div className="ad-topbar-right">
             {/* Notifications, Settings, and Profile Avatar removed as per Part 1 UI Refinements */}
@@ -319,11 +329,11 @@ function AdminDashboard() {
                 </div>
                 <div className="ad-kpi-split-vals">
                   <div className="ad-kpi-split-group">
-                    <div className="ad-split-val text-primary">{stats.active}</div>
+                    <div className="ad-split-val text-primary">{totalActive}</div>
                     <div className="ad-split-label">Active</div>
                   </div>
                   <div className="ad-kpi-split-group">
-                    <div className="ad-split-val text-secondary">{stats.completed}</div>
+                    <div className="ad-split-val text-secondary">{totalCompleted}</div>
                     <div className="ad-split-label">Completed</div>
                   </div>
                 </div>

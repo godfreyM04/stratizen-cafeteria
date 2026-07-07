@@ -218,8 +218,13 @@ export async function generateExecutiveReport() {
     // Kitchen Staff Performance ranking
     const chefOrderCounts = {};
     completedOrders.forEach(order => {
-      if (order.assigned_chef_id) {
-        chefOrderCounts[order.assigned_chef_id] = (chefOrderCounts[order.assigned_chef_id] || 0) + 1;
+      let chefId = order.assigned_chef_id;
+      if (!chefId && order.notes) {
+        const match = order.notes.match(/ChefID:([a-f0-9-]+)/);
+        if (match) chefId = match[1];
+      }
+      if (chefId) {
+        chefOrderCounts[chefId] = (chefOrderCounts[chefId] || 0) + 1;
       }
     });
     const rankedChefs = (chefs || []).map(chef => ({

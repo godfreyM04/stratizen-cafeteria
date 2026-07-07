@@ -510,10 +510,6 @@ function UserManagement() {
             </button>
             <h2 className="um-brand-title">Stratizen Cafeteria</h2>
           </div>
-          <div className="um-search-container">
-            <span className="material-symbols-outlined um-search-icon">search</span>
-            <input className="um-search-input" placeholder="Search across modules..." type="text" readOnly />
-          </div>
           <div className="um-topbar-right" />
         </header>
 
@@ -572,10 +568,6 @@ function UserManagement() {
                         onChange={(e) => setStudentSearch(e.target.value)}
                       />
                     </div>
-                    <button className="um-filter-btn" onClick={fetchStudents} title="Refresh">
-                      <span className="material-symbols-outlined">refresh</span>
-                      <span>Refresh</span>
-                    </button>
                   </div>
 
                   <div className="um-table-container">

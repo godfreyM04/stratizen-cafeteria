@@ -5,7 +5,7 @@ import { supabase } from "../lib/supabase";
 import { useToast } from "../context/ToastContext";
 import ChefNotificationCentre from "../components/ChefNotificationCentre";
 import ChefLogoutButton from "../components/ChefLogoutButton";
-import "../styles/ChefDashboard.css"; // Reuse dashboard styles for layout
+import "../styles/ChefNotifications.css";
 
 const getElapsedTime = (placedAtString) => {
   if (!placedAtString) return "Just now";
@@ -104,7 +104,21 @@ export default function ChefNotifications() {
         })
         .eq("id", orderId);
 
-      if (error) throw error;
+      if (error) {
+        const currentOrder = pendingOrders.find(o => o.id === orderId);
+        const existingNotes = currentOrder?.notes || "";
+        const updatedNotes = `ChefID:${profile?.id}` + (existingNotes ? ` | ${existingNotes}` : "");
+
+        const { error: fallbackError } = await supabase
+          .from("orders")
+          .update({ 
+            status: "preparing",
+            notes: updatedNotes
+          })
+          .eq("id", orderId);
+
+        if (fallbackError) throw fallbackError;
+      }
       
       const displayId = orderId.substring(0, 8).toUpperCase();
       addToast(`Order #STZ-${displayId} is now being prepared!`);
@@ -144,70 +158,71 @@ export default function ChefNotifications() {
   const unreadCount = pendingOrders.filter(o => !readIds.includes(o.id)).length;
 
   return (
-    <div className="chef-dashboard-container text-on-background min-h-screen flex">
+    <div className="chef-notifications-container">
       {/* SideNavBar */}
-      <aside className="h-screen w-64 fixed left-0 top-0 bg-surface-container border-r border-outline-variant flex flex-col py-lg z-50">
-        <div className="px-lg mb-xl">
-          <div className="flex items-center gap-sm mb-xs">
-            <span className="material-symbols-outlined text-primary text-3xl fill-icon">restaurant</span>
-            <h1 className="font-headline-lg text-headline-lg text-primary font-bold leading-tight">Stratizen</h1>
+      <aside>
+        <div className="cn-logo-area">
+          <div className="cn-logo-icon">
+            <span className="material-symbols-outlined fill-icon">restaurant</span>
           </div>
-          <p className="font-label-md text-on-surface-variant opacity-70">Chef Management Portal</p>
+          <div>
+            <h1 className="cn-chef-name" style={{ fontSize: "18px", fontWeight: "700", color: "var(--color-primary)" }}>Stratizen</h1>
+            <p className="cn-chef-role" style={{ fontSize: "10px" }}>Chef Management</p>
+          </div>
         </div>
         
-        <nav className="flex-1 px-md space-y-xs">
-          <div className={`flex items-center gap-md rounded-lg px-md py-sm cursor-pointer duration-200 ${location.pathname === '/chef/dashboard' ? 'bg-secondary-container text-on-secondary-container font-medium' : 'text-on-surface hover:bg-surface-container-high'}`} onClick={() => navigate("/chef/dashboard")}>
+        <nav className="cn-nav-menu">
+          <a className={`cn-nav-item ${location.pathname === "/chef/dashboard" ? "active" : ""}`} onClick={() => navigate("/chef/dashboard")}>
             <span className="material-symbols-outlined">dashboard</span>
-            <span className="font-label-lg text-label-lg">Kitchen Dashboard</span>
-          </div>
-          <div className={`flex items-center gap-md rounded-lg px-md py-sm cursor-pointer duration-200 ${location.pathname === '/chef/menu' ? 'bg-secondary-container text-on-secondary-container font-medium' : 'text-on-surface hover:bg-surface-container-high'}`} onClick={() => navigate("/chef/menu")}>
+            <span className="cn-nav-item-text">Kitchen Dashboard</span>
+          </a>
+          <a className={`cn-nav-item ${location.pathname === "/chef/menu" ? "active" : ""}`} onClick={() => navigate("/chef/menu")}>
             <span className="material-symbols-outlined">restaurant_menu</span>
-            <span className="font-label-lg text-label-lg">Menu Manager</span>
-          </div>
-          <div className={`flex items-center gap-md rounded-lg px-md py-sm cursor-pointer duration-200 ${location.pathname === '/chef/pending' ? 'bg-secondary-container text-on-secondary-container font-medium' : 'text-on-surface hover:bg-surface-container-high'}`} onClick={() => navigate("/chef/pending")}>
+            <span className="cn-nav-item-text">Menu Manager</span>
+          </a>
+          <a className={`cn-nav-item ${location.pathname === "/chef/pending" ? "active" : ""}`} onClick={() => navigate("/chef/pending")}>
             <span className="material-symbols-outlined">receipt_long</span>
-            <span className="font-label-lg text-label-lg">Order Queue</span>
-          </div>
-          <div className={`flex items-center gap-md rounded-lg px-md py-sm cursor-pointer duration-200 ${location.pathname === '/chef/monitor' ? 'bg-secondary-container text-on-secondary-container font-medium' : 'text-on-surface hover:bg-surface-container-high'}`} onClick={() => navigate("/chef/monitor")}>
+            <span className="cn-nav-item-text">Order Queue</span>
+          </a>
+          <a className={`cn-nav-item ${location.pathname === "/chef/monitor" ? "active" : ""}`} onClick={() => navigate("/chef/monitor")}>
             <span className="material-symbols-outlined">soup_kitchen</span>
-            <span className="font-label-lg text-label-lg">Kitchen Monitor</span>
-          </div>
-          <div className={`flex items-center gap-md rounded-lg px-md py-sm cursor-pointer duration-200 ${location.pathname === '/chef/ready' ? 'bg-secondary-container text-on-secondary-container font-medium' : 'text-on-surface hover:bg-surface-container-high'}`} onClick={() => navigate("/chef/ready")}>
+            <span className="cn-nav-item-text">Kitchen Monitor</span>
+          </a>
+          <a className={`cn-nav-item ${location.pathname === "/chef/ready" ? "active" : ""}`} onClick={() => navigate("/chef/ready")}>
             <span className="material-symbols-outlined">storefront</span>
-            <span className="font-label-lg text-label-lg">Ready to Collect</span>
-          </div>
-          <div className={`flex items-center gap-md rounded-lg px-md py-sm cursor-pointer duration-200 ${location.pathname === '/chef/history' ? 'bg-secondary-container text-on-secondary-container font-medium' : 'text-on-surface hover:bg-surface-container-high'}`} onClick={() => navigate("/chef/history")}>
+            <span className="cn-nav-item-text">Ready to Collect</span>
+          </a>
+          <a className={`cn-nav-item ${location.pathname === "/chef/history" ? "active" : ""}`} onClick={() => navigate("/chef/history")}>
             <span className="material-symbols-outlined">history</span>
-            <span className="font-label-lg text-label-lg">Order History</span>
-          </div>
+            <span className="cn-nav-item-text">Order History</span>
+          </a>
         </nav>
         
-        <div className="px-md mt-auto pt-lg border-t border-outline-variant/30 space-y-xs">
+        <div style={{ padding: "0 16px", marginTop: "auto" }}>
           <ChefLogoutButton />
         </div>
       </aside>
 
       {/* Main Content Area */}
-      <main className="ml-64 flex-1 flex flex-col min-h-screen bg-surface">
-        
+      <main>
         {/* TopAppBar */}
-        <header className="w-full h-16 flex justify-between items-center px-lg bg-surface/80 backdrop-blur-md shadow-sm sticky top-0 z-40 border-b border-outline-variant/20">
-          <div className="flex items-center gap-lg">
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-on-surface-variant">search</span>
-              <input className="bg-surface-container border-none rounded-full pl-10 pr-lg py-sm text-body-md w-80 focus:ring-2 focus:ring-primary outline-none" placeholder="Search orders or items..." type="text" />
+        <header>
+          <div className="cn-topbar-left">
+            <div className="cn-search-wrapper">
+              <span className="material-symbols-outlined cn-search-icon">search</span>
+              <input className="cn-search-input" placeholder="Search orders or items..." type="text" />
             </div>
           </div>
           
-          <div className="flex items-center gap-md">
+          <div className="cn-topbar-right">
             <ChefNotificationCentre />
-            <div className="h-8 w-[1px] bg-outline-variant mx-sm"></div>
-            <div className="flex items-center gap-sm">
-              <div className="text-right">
-                <p className="font-label-lg text-label-lg text-on-surface">{profile?.full_name || "Chef"}</p>
-                <p className="text-[10px] text-on-surface-variant uppercase tracking-wider">Executive Chef</p>
+            <div style={{ width: "1px", height: "32px", backgroundColor: "var(--color-outline-variant)", margin: "0 8px" }}></div>
+            <div className="cn-chef-profile-info">
+              <div className="cn-chef-profile-text">
+                <p className="cn-chef-name">{profile?.full_name || "Chef"}</p>
+                <p className="cn-chef-role">Executive Chef</p>
               </div>
-              <div className="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center font-bold text-title-lg">
+              <div className="cn-chef-avatar">
                 {(profile?.full_name || "C").charAt(0).toUpperCase()}
               </div>
             </div>
@@ -215,76 +230,71 @@ export default function ChefNotifications() {
         </header>
 
         {/* Page Content */}
-        <div className="p-md md:p-lg overflow-y-auto">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex flex-col md:flex-row md:items-center justify-between mb-lg gap-md pt-md">
-              <div>
-                <h1 className="text-headline-lg text-primary font-bold">Notification Centre</h1>
-                <p className="text-on-surface-variant text-body-md mt-1">Manage your daily kitchen and system notifications</p>
-              </div>
-              
-              <button 
-                className={`flex items-center justify-center gap-sm px-md py-sm rounded-lg border text-label-lg transition-colors cursor-pointer ${isMarkingAllRead ? 'bg-secondary-container text-on-secondary-container border-transparent' : 'border-outline text-primary hover:bg-primary/5 bg-transparent'}`}
-                onClick={markAllAsRead}
-                disabled={isMarkingAllRead || unreadCount === 0}
-                type="button"
-              >
-                {isMarkingAllRead ? (
-                  <><span className="material-symbols-outlined text-[18px]">check</span> Done</>
-                ) : (
-                  <><span className="material-symbols-outlined text-[18px]">done_all</span> Mark all as read</>
-                )}
-              </button>
+        <div className="cn-page-content">
+          <div className="cn-header-row">
+            <div>
+              <h1 className="cn-title">Notification Centre</h1>
+              <p className="cn-subtitle">Manage your daily kitchen and system notifications</p>
             </div>
+            
+            <button 
+              className="cn-mark-read-btn"
+              onClick={markAllAsRead}
+              disabled={isMarkingAllRead || unreadCount === 0}
+              type="button"
+            >
+              {isMarkingAllRead ? "Done" : "Mark all as read"}
+            </button>
+          </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-md gap-y-lg pb-xl" id="notification-container">
-              {pendingOrders.length === 0 ? (
-                <div className="md:col-span-12 flex flex-col items-center justify-center py-xl text-center">
-                  <span className="material-symbols-outlined text-outline text-[48px] mb-md opacity-50">notifications_paused</span>
-                  <h3 className="text-title-lg text-on-surface font-medium">No active notifications</h3>
-                  <p className="text-body-md text-on-surface-variant mt-sm">You're all caught up! New student orders will appear here instantly.</p>
-                </div>
-              ) : (
-                pendingOrders.map(order => {
-                  const isRead = readIds.includes(order.id);
-                  const itemsSummary = (order.order_items || [])
-                    .map(oi => `${oi.quantity}x ${oi.menu?.name || 'Item'}`)
-                    .join(", ");
-                    
-                  const displayId = order.id.substring(0, 8).toUpperCase();
+          <div className="cn-list" id="notification-container">
+            {pendingOrders.length === 0 ? (
+              <div className="cn-empty-state">
+                <span className="material-symbols-outlined cn-empty-icon">notifications_paused</span>
+                <h3 className="cn-empty-title">No active notifications</h3>
+                <p className="cn-empty-desc">You're all caught up! New student orders will appear here instantly.</p>
+              </div>
+            ) : (
+              pendingOrders.map(order => {
+                const isRead = readIds.includes(order.id);
+                const itemsSummary = (order.order_items || [])
+                  .map(oi => `${oi.quantity}x ${oi.menu?.name || "Item"}`)
+                  .join(", ");
+                  
+                const displayId = order.id.substring(0, 8).toUpperCase();
 
-                  return (
-                    <div 
-                      key={order.id} 
-                      className={`md:col-span-12 rounded-xl p-md flex gap-md group transition-all duration-300 relative ${isRead ? 'bg-white border border-outline-variant opacity-75' : 'bg-primary-container/10 border-l-4 border-primary animate-slide-in'}`}
-                    >
-                      <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-on-primary flex-shrink-0">
-                        <span className="material-symbols-outlined">shopping_cart</span>
+                return (
+                  <div 
+                    key={order.id} 
+                    className={`cn-card ${isRead ? "read" : ""}`}
+                  >
+                    <div className="cn-card-icon">
+                      <span className="material-symbols-outlined">shopping_cart</span>
+                    </div>
+                    <div className="cn-card-content">
+                      <div className="cn-card-header">
+                        <h3 className={`cn-card-title ${isRead ? "read" : ""}`}>New Order Received</h3>
+                        <span className="cn-card-time">{getElapsedTime(order.created_at)}</span>
                       </div>
-                      <div className="flex-1">
-                        <div className="flex justify-between items-start">
-                          <h3 className={`text-title-lg font-bold ${isRead ? 'text-on-surface' : 'text-primary'}`}>New Order Received</h3>
-                          <span className="text-label-md text-outline whitespace-nowrap ml-md pr-6 md:pr-0">{getElapsedTime(order.created_at)}</span>
-                        </div>
-                        <p className="text-body-md text-on-surface mb-md mt-xs">
-                          Order <span className="font-bold">#STZ-{displayId}</span>: {itemsSummary}.
-                        </p>
-                        <div className="flex gap-sm">
+                      <p className="cn-card-text">
+                        Order <span style={{ fontWeight: "700" }}>#STZ-{displayId}</span>: {itemsSummary}.
+                      </p>
+                      {!isRead && (
+                        <div style={{ display: "flex", gap: "8px" }}>
                           <button 
-                            className="bg-primary text-on-primary px-md py-sm rounded-lg text-label-md font-medium hover:opacity-90 transition-opacity border-none cursor-pointer active:scale-95"
+                            className="cn-prep-btn"
                             onClick={() => handleStartPreparing(order.id)}
                             type="button"
                           >
                             Start Preparing
                           </button>
                         </div>
-                      </div>
+                      )}
                     </div>
-                  );
-                })
-              )}
-            </div>
-            
+                  </div>
+                );
+              })
+            )}
           </div>
         </div>
       </main>

@@ -42,20 +42,49 @@ function ReportsAnalytics() {
   // Fetch all live Supabase data
   const fetchAnalyticsData = useCallback(async () => {
     try {
-      // 1. Fetch completed orders with items & menu mappings
+      // 1. Fetch completed orders with items & menu mappings via RPC to bypass RLS
       const { data: ordersData, error: ordersError } = await supabase
-        .from("orders")
-        .select(`
-          *,
-          order_items(
-            quantity,
-            menu(id, name, image_url)
-          )
-        `)
-        .order("created_at", { ascending: false });
-
+        .rpc("admin_get_all_orders");
       if (ordersError) throw ordersError;
-      setOrders(ordersData || []);
+
+      // 2. Fetch order items via RPC
+      const { data: itemsData, error: itemsError } = await supabase
+        .rpc("admin_get_all_order_items");
+      if (itemsError) throw itemsError;
+
+      // 3. Fetch menu items to map images
+      const { data: menuData, error: menuError } = await supabase
+        .from("menu")
+        .select("id, name, image_url");
+      if (menuError) throw menuError;
+
+      const menuMap = {};
+      (menuData || []).forEach(m => {
+        menuMap[m.id] = m;
+      });
+
+      // Group items by order_id
+      const itemsMap = {};
+      (itemsData || []).forEach(item => {
+        if (!itemsMap[item.order_id]) {
+          itemsMap[item.order_id] = [];
+        }
+        itemsMap[item.order_id].push({
+          quantity: item.quantity,
+          menu: {
+            id: item.menu_item_id,
+            name: item.menu_name || "Meal",
+            image_url: menuMap[item.menu_item_id]?.image_url || null
+          }
+        });
+      });
+
+      const mappedOrders = (ordersData || []).map(o => ({
+        ...o,
+        order_items: itemsMap[o.id] || []
+      }));
+
+      setOrders(mappedOrders);
 
       // 2. Fetch all chefs
       const { data: chefsData, error: chefsError } = await supabase
@@ -185,8 +214,13 @@ function ReportsAnalytics() {
     const chefCounts = {};
 
     metrics.completed.forEach((order) => {
-      if (order.assigned_chef_id) {
-        chefCounts[order.assigned_chef_id] = (chefCounts[order.assigned_chef_id] || 0) + 1;
+      let chefId = order.assigned_chef_id;
+      if (!chefId && order.notes) {
+        const match = order.notes.match(/ChefID:([a-f0-9-]+)/);
+        if (match) chefId = match[1];
+      }
+      if (chefId) {
+        chefCounts[chefId] = (chefCounts[chefId] || 0) + 1;
       }
     });
 
