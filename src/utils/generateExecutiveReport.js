@@ -134,19 +134,34 @@ function drawFooter(doc, pageNumber, pageCount) {
 // Main PDF Generator
 export async function generateExecutiveReport() {
   try {
-    // 1. Fetch completed orders with items
-    const { data: orders, error: ordersError } = await supabase
-      .from("orders")
-      .select(`
-        *,
-        order_items(
-          quantity,
-          menu(name, image_url)
-        )
-      `)
-      .order("created_at", { ascending: false });
-
+    // 1. Fetch completed orders via RPC to bypass RLS
+    const { data: ordersData, error: ordersError } = await supabase
+      .rpc("admin_get_all_orders");
     if (ordersError) throw ordersError;
+
+    // 2. Fetch order items via RPC
+    const { data: itemsData, error: itemsError } = await supabase
+      .rpc("admin_get_all_order_items");
+    if (itemsError) throw itemsError;
+
+    // Group items by order_id
+    const itemsMap = {};
+    (itemsData || []).forEach(item => {
+      if (!itemsMap[item.order_id]) {
+        itemsMap[item.order_id] = [];
+      }
+      itemsMap[item.order_id].push({
+        quantity: item.quantity,
+        menu: {
+          name: item.menu_name || "Meal"
+        }
+      });
+    });
+
+    const orders = (ordersData || []).map(o => ({
+      ...o,
+      order_items: itemsMap[o.id] || []
+    }));
 
     // Fetch all chef profiles
     const { data: chefs, error: chefsError } = await supabase
@@ -383,7 +398,7 @@ export async function generateExecutiveReport() {
       startY: cursorY,
       margin: { left: PAGE.marginX, right: PAGE.width / 2 + 2 },
       head: [["Menu Item Name", "Orders Count"]],
-      body: topItems.length === 0 ? [["No data available", "0"]] : topItems.map(item => [item.name, `${item.count} orders`]),
+      body: topItems.length === 0 ? [["No data available", "0"]] : topItems.slice(0, 3).map(item => [item.name, `${item.count} orders`]),
       theme: "plain",
       styles: {
         font: "helvetica",
@@ -413,7 +428,7 @@ export async function generateExecutiveReport() {
       startY: cursorY,
       margin: { left: PAGE.width / 2 + 6, right: PAGE.marginX },
       head: [["Chef Name", "Completed Orders"]],
-      body: rankedChefs.length === 0 ? [["No chefs registered", "0"]] : rankedChefs.map(chef => [chef.name, `${chef.count} completed`]),
+      body: rankedChefs.length === 0 ? [["No chefs registered", "0"]] : rankedChefs.slice(0, 3).map(chef => [chef.name, `${chef.count} completed`]),
       theme: "plain",
       styles: {
         font: "helvetica",

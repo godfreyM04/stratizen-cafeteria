@@ -182,7 +182,7 @@ function ReportsAnalytics() {
       name: day,
       label: day.substring(0, 3),
       value: dailyRevMap[day],
-      heightPct: Math.max((dailyRevMap[day] / maxRevenue) * 100, 2),
+      heightPct: dailyRevMap[day] > 0 ? Math.max((dailyRevMap[day] / maxRevenue) * 100, 2) : 0,
     }));
   }, [metrics]);
 
@@ -485,7 +485,7 @@ function ReportsAnalytics() {
                       {topMenuItems.length === 0 ? (
                         <p className="ra-empty-state">No menu items ordered yet.</p>
                       ) : (
-                        topMenuItems.slice(0, 5).map((item, idx) => (
+                        topMenuItems.slice(0, 3).map((item, idx) => (
                           <div key={item.name} className="ra-ranking-item">
                             <div className="ra-ranking-info">
                               <div className="ra-rank-badge">{idx + 1}</div>
@@ -506,7 +506,7 @@ function ReportsAnalytics() {
                       {staffPerformance.length === 0 ? (
                         <p className="ra-empty-state">No chef profiles registered.</p>
                       ) : (
-                        staffPerformance.map((chef, idx) => (
+                        staffPerformance.slice(0, 3).map((chef, idx) => (
                           <div key={chef.id} className="ra-ranking-item">
                             <div className="ra-ranking-info">
                               <div className="ra-rank-badge font-fill">{idx + 1}</div>

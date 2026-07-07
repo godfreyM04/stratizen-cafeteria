@@ -729,3 +729,17 @@
   color: var(--color-primary);
 }
 
+.om-items-list {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  max-width: 100%;
+}
+
+.om-item-bullet {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-text-variant);
+  line-height: 1.3;
+}
+

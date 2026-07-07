@@ -263,7 +263,7 @@ BEGIN
     o.id, o.user_id, o.student_name, o.student_id, o.pickup_option, o.status,
     o.total_items, o.subtotal, o.total, o.wallet_deduction, o.notes,
     o.prep_started_at, o.ready_at, o.collected_at, o.created_at, o.updated_at,
-    NULL::uuid as assigned_chef_id
+    o.assigned_chef_id
   FROM public.orders o
   ORDER BY o.created_at DESC;
 END;

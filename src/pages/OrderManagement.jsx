@@ -412,11 +412,19 @@ function OrderManagement() {
                               </span>
                             </div>
                             
-                            <div className="om-info-row">
-                              <span className="material-symbols-outlined om-info-icon">restaurant_menu</span>
-                              <span className="om-info-value om-items-text" title={itemsOrdered}>
-                                {itemsOrdered || "—"}
-                              </span>
+                            <div className="om-info-row" style={{ alignItems: "flex-start" }}>
+                              <span className="material-symbols-outlined om-info-icon" style={{ marginTop: "3px" }}>restaurant_menu</span>
+                              <div className="om-info-value om-items-list">
+                                {order.order_items && order.order_items.length > 0 ? (
+                                  order.order_items.map((oi, idx) => (
+                                    <div key={idx} className="om-item-bullet">
+                                      • {oi.menu?.name || "Meal"} ×{oi.quantity}
+                                    </div>
+                                  ))
+                                ) : (
+                                  <span className="om-unassigned">—</span>
+                                )}
+                              </div>
                             </div>
                             
                             <div className="om-info-row">
