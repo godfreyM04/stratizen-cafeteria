@@ -314,7 +314,8 @@ RETURNS TABLE (
   quantity integer,
   unit_price numeric,
   subtotal numeric,
-  menu_name text
+  menu_name text,
+  menu_image_url text
 )
 LANGUAGE plpgsql
 SECURITY DEFINER
@@ -324,7 +325,8 @@ BEGIN
   RETURN QUERY 
   SELECT 
     oi.id, oi.order_id, oi.menu_item_id, oi.quantity, oi.unit_price, oi.subtotal,
-    m.name as menu_name
+    m.name as menu_name,
+    m.image_url as menu_image_url
   FROM public.order_items oi
   LEFT JOIN public.menu m ON m.id = oi.menu_item_id;
 END;
