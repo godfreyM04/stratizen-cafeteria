@@ -132,120 +132,29 @@ function drawFooter(doc, pageNumber, pageCount) {
 }
 
 // Main PDF Generator
-export async function generateExecutiveReport() {
+export async function generateExecutiveReport(metrics, weeklyTrendData, topMenuItems, staffPerformance) {
   try {
-    // 1. Fetch completed orders via RPC to bypass RLS
-    const { data: ordersData, error: ordersError } = await supabase
-      .rpc("admin_get_all_orders");
-    if (ordersError) throw ordersError;
+    const totalRevenue = metrics.totalRevenue;
+    const totalOrdersCount = metrics.completedOrdersCount;
+    const avgDailyRevenue = metrics.avgDailyRevenue;
+    const avgOrderValue = metrics.avgOrderValue;
+    const avgPrepTimeStr = metrics.avgPrepTimeMins > 0 ? `${metrics.avgPrepTimeMins} min` : "—";
 
-    // 2. Fetch order items via RPC
-    const { data: itemsData, error: itemsError } = await supabase
-      .rpc("admin_get_all_order_items");
-    if (itemsError) throw itemsError;
-
-    // Group items by order_id
-    const itemsMap = {};
-    (itemsData || []).forEach(item => {
-      if (!itemsMap[item.order_id]) {
-        itemsMap[item.order_id] = [];
-      }
-      itemsMap[item.order_id].push({
-        quantity: item.quantity,
-        menu: {
-          name: item.menu_name || "Meal"
-        }
-      });
+    // Map weeklyTrendData to a map by day name
+    const weekdayRevenue = {};
+    (weeklyTrendData || []).forEach(d => {
+      weekdayRevenue[d.name] = d.value;
     });
 
-    const orders = (ordersData || []).map(o => ({
-      ...o,
-      order_items: itemsMap[o.id] || []
+    const topItems = (topMenuItems || []).map(item => ({
+      name: item.name,
+      count: item.count
     }));
 
-    // Fetch all chef profiles
-    const { data: chefs, error: chefsError } = await supabase
-      .from("profiles")
-      .select("*")
-      .eq("role", "chef");
-
-    if (chefsError) throw chefsError;
-
-    const completedOrders = (orders || []).filter(o => o.status === "collected");
-
-    // 2. Perform Dynamic Analytics Calculations
-    const totalRevenue = completedOrders.reduce((sum, o) => sum + parseFloat(o.total || 0), 0);
-    const totalOrdersCount = completedOrders.length;
-    
-    const uniqueDays = new Set(completedOrders.map(o => new Date(o.created_at).toDateString()));
-    const numDays = uniqueDays.size || 1;
-    const avgDailyRevenue = totalRevenue / numDays;
-    const avgOrderValue = totalOrdersCount > 0 ? (totalRevenue / totalOrdersCount) : 0;
-
-    // Average Preparation Time calculation
-    const ordersWithPrepTime = completedOrders.filter(o => o.prep_started_at && o.ready_at);
-    let avgPrepTimeStr = "—";
-    if (ordersWithPrepTime.length > 0) {
-      const totalPrepTimeMs = ordersWithPrepTime.reduce((sum, o) => {
-        const start = new Date(o.prep_started_at).getTime();
-        const ready = new Date(o.ready_at).getTime();
-        return sum + Math.max(0, ready - start);
-      }, 0);
-      const avgPrepTimeMs = totalPrepTimeMs / ordersWithPrepTime.length;
-      const mins = Math.round(avgPrepTimeMs / 60000);
-      avgPrepTimeStr = `${mins} min`;
-    }
-
-    // Weekly Revenue Trend calculations
-    const weekdayRevenue = {
-      Monday: 0,
-      Tuesday: 0,
-      Wednesday: 0,
-      Thursday: 0,
-      Friday: 0,
-      Saturday: 0,
-      Sunday: 0
-    };
-    completedOrders.forEach(o => {
-      const d = new Date(o.created_at);
-      const daysMap = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-      const dayName = daysMap[d.getDay()];
-      weekdayRevenue[dayName] += parseFloat(o.total || 0);
-    });
-
-    // Top Performing Menu Items counts
-    const itemCounts = {};
-    completedOrders.forEach(order => {
-      (order.order_items || []).forEach(oi => {
-        const itemName = oi.menu?.name;
-        if (itemName) {
-          if (!itemCounts[itemName]) {
-            itemCounts[itemName] = 0;
-          }
-          itemCounts[itemName] += oi.quantity;
-        }
-      });
-    });
-    const topItems = Object.entries(itemCounts)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-
-    // Kitchen Staff Performance ranking
-    const chefOrderCounts = {};
-    completedOrders.forEach(order => {
-      let chefId = order.assigned_chef_id;
-      if (!chefId && order.notes) {
-        const match = order.notes.match(/ChefID:([a-f0-9-]+)/);
-        if (match) chefId = match[1];
-      }
-      if (chefId) {
-        chefOrderCounts[chefId] = (chefOrderCounts[chefId] || 0) + 1;
-      }
-    });
-    const rankedChefs = (chefs || []).map(chef => ({
-      name: chef.full_name,
-      count: chefOrderCounts[chef.id] || 0
-    })).sort((a, b) => b.count - a.count);
+    const rankedChefs = (staffPerformance || []).map(chef => ({
+      name: chef.name,
+      count: chef.completedCount
+    }));
 
     // 3. Build the PDF Document
     const doc = new jsPDF({

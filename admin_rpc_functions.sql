@@ -194,12 +194,45 @@ GRANT EXECUTE ON FUNCTION public.admin_delete_chef(uuid) TO anon, authenticated;
 -- ============================================================
 -- PART 7: Update menu table policies to allow both chefs and admins
 -- ============================================================
+DROP POLICY IF EXISTS "Menu is viewable by everyone" ON public.menu;
+CREATE POLICY "Menu is viewable by everyone" ON public.menu
+  FOR SELECT USING (true);
+
+DROP POLICY IF EXISTS "Chefs and admins can modify the menu" ON public.menu;
 DROP POLICY IF EXISTS "Only chefs can modify the menu" ON public.menu;
-CREATE POLICY "Chefs and admins can modify the menu" ON public.menu
-  FOR ALL USING (
+DROP POLICY IF EXISTS "Chefs and admins can insert menu items" ON public.menu;
+DROP POLICY IF EXISTS "Chefs and admins can update menu items" ON public.menu;
+DROP POLICY IF EXISTS "Chefs and admins can delete menu items" ON public.menu;
+
+DROP POLICY IF EXISTS "Admins can insert menu items" ON public.menu;
+DROP POLICY IF EXISTS "Admins can delete menu items" ON public.menu;
+
+CREATE POLICY "Admins can insert menu items" ON public.menu
+  FOR INSERT WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
+    )
+  );
+
+CREATE POLICY "Chefs and admins can update menu items" ON public.menu
+  FOR UPDATE USING (
     EXISTS (
       SELECT 1 FROM public.profiles
       WHERE profiles.id = auth.uid() AND profiles.role IN ('chef', 'admin')
+    )
+  ) WITH CHECK (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid() AND profiles.role IN ('chef', 'admin')
+    )
+  );
+
+CREATE POLICY "Admins can delete menu items" ON public.menu
+  FOR DELETE USING (
+    EXISTS (
+      SELECT 1 FROM public.profiles
+      WHERE profiles.id = auth.uid() AND profiles.role = 'admin'
     )
   );
 
@@ -271,6 +304,8 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.admin_get_all_orders() TO anon, authenticated;
 
+DROP FUNCTION IF EXISTS public.admin_get_all_order_items();
+
 CREATE OR REPLACE FUNCTION public.admin_get_all_order_items()
 RETURNS TABLE (
   id uuid,
@@ -296,6 +331,114 @@ END;
 $$;
 
 GRANT EXECUTE ON FUNCTION public.admin_get_all_order_items() TO anon, authenticated;
+
+-- ============================================================
+-- PART 11: Storage Bucket and Policies for Menu Images
+-- ============================================================
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('menu-images', 'menu-images', true)
+ON CONFLICT (id) DO NOTHING;
+
+DROP POLICY IF EXISTS "Public access to menu images" ON storage.objects;
+CREATE POLICY "Public access to menu images" ON storage.objects
+  FOR SELECT USING (bucket_id = 'menu-images');
+
+DROP POLICY IF EXISTS "Admins can upload menu images" ON storage.objects;
+CREATE POLICY "Admins can upload menu images" ON storage.objects
+  FOR INSERT WITH CHECK (bucket_id = 'menu-images');
+
+DROP POLICY IF EXISTS "Admins can update menu images" ON storage.objects;
+CREATE POLICY "Admins can update menu images" ON storage.objects
+  FOR UPDATE USING (bucket_id = 'menu-images');
+
+DROP POLICY IF EXISTS "Admins can delete menu images" ON storage.objects;
+CREATE POLICY "Admins can delete menu images" ON storage.objects
+  FOR DELETE USING (bucket_id = 'menu-images');
+
+-- ============================================================
+-- PART 12: Admin Menu CRUD RPC Functions (bypasses RLS for mock session)
+-- ============================================================
+
+DROP FUNCTION IF EXISTS public.admin_create_menu_item(text, text, text, numeric, text, boolean);
+CREATE OR REPLACE FUNCTION public.admin_create_menu_item(
+  p_name text,
+  p_category text,
+  p_description text,
+  p_price numeric,
+  p_image_url text,
+  p_availability boolean
+)
+RETURNS public.menu
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_item public.menu;
+BEGIN
+  INSERT INTO public.menu (name, category, description, price, image_url, availability)
+  VALUES (p_name, p_category, p_description, p_price, p_image_url, p_availability)
+  RETURNING * INTO v_item;
+  RETURN v_item;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_create_menu_item(text, text, text, numeric, text, boolean) TO anon, authenticated;
+
+
+DROP FUNCTION IF EXISTS public.admin_update_menu_item(uuid, text, text, text, numeric, text, boolean);
+CREATE OR REPLACE FUNCTION public.admin_update_menu_item(
+  p_id uuid,
+  p_name text,
+  p_category text,
+  p_description text,
+  p_price numeric,
+  p_image_url text,
+  p_availability boolean
+)
+RETURNS public.menu
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_item public.menu;
+BEGIN
+  UPDATE public.menu
+  SET 
+    name = p_name,
+    category = p_category,
+    description = p_description,
+    price = p_price,
+    image_url = p_image_url,
+    availability = p_availability,
+    updated_at = now()
+  WHERE id = p_id
+  RETURNING * INTO v_item;
+  RETURN v_item;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_update_menu_item(uuid, text, text, text, numeric, text, boolean) TO anon, authenticated;
+
+
+DROP FUNCTION IF EXISTS public.admin_delete_menu_item(uuid);
+CREATE OR REPLACE FUNCTION public.admin_delete_menu_item(
+  p_id uuid
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  DELETE FROM public.menu
+  WHERE id = p_id;
+  RETURN FOUND;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.admin_delete_menu_item(uuid) TO anon, authenticated;
 
 -- ============================================================
 -- DONE — All functions and policy updates created successfully.

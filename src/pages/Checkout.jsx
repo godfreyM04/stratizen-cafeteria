@@ -13,20 +13,20 @@ const formatKES = (price) => {
 // Canvas-based particles celebration animation
 const CelebrationCanvas = () => {
   const canvasRef = useRef(null);
-  
+
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     let animationFrameId;
-    
+
     const resize = () => {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
     };
     resize();
     window.addEventListener("resize", resize);
-    
+
     class Confetti {
       constructor() {
         this.x = Math.random() * canvas.width;
@@ -35,7 +35,7 @@ const CelebrationCanvas = () => {
         this.speedX = Math.random() * 4 - 2;
         this.speedY = Math.random() * 4 + 4;
         const isDark = document.documentElement.classList.contains("dark");
-        const colors = isDark 
+        const colors = isDark
           ? ["#4f8eff", "#3ad06c", "#61c3f2", "#ff8c00", "#ffd54f", "#e91e63"]
           : ["#003366", "#1b6d24", "#00668e", "#ff8c00", "#ffd54f", "#e91e63"];
         this.color = colors[Math.floor(Math.random() * colors.length)];
@@ -60,7 +60,7 @@ const CelebrationCanvas = () => {
         ctx.restore();
       }
     }
-    
+
     class Sparkle {
       constructor() {
         this.x = Math.random() * canvas.width;
@@ -90,7 +90,7 @@ const CelebrationCanvas = () => {
         ctx.globalAlpha = this.alpha;
         ctx.fillStyle = "#ffb77d";
         ctx.beginPath();
-        
+
         const cx = this.x;
         const cy = this.y;
         const spikes = 4;
@@ -98,14 +98,14 @@ const CelebrationCanvas = () => {
         const innerRadius = this.size;
         let rot = (Math.PI / 2) * 3;
         const step = Math.PI / spikes;
-        
+
         ctx.moveTo(cx, cy - outerRadius);
         for (let i = 0; i < spikes; i++) {
           const rx = cx + Math.cos(rot) * outerRadius;
           const ry = cy + Math.sin(rot) * outerRadius;
           ctx.lineTo(rx, ry);
           rot += step;
-          
+
           const ix = cx + Math.cos(rot) * innerRadius;
           const iy = cy + Math.sin(rot) * innerRadius;
           ctx.lineTo(ix, iy);
@@ -117,34 +117,34 @@ const CelebrationCanvas = () => {
         ctx.restore();
       }
     }
-    
+
     const confettis = Array.from({ length: 120 }, () => new Confetti());
     const sparkles = Array.from({ length: 50 }, () => new Sparkle());
-    
+
     const animate = () => {
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-      
+
       sparkles.forEach((s) => {
         s.update();
         s.draw();
       });
-      
+
       confettis.forEach((c) => {
         c.update();
         c.draw();
       });
-      
+
       animationFrameId = requestAnimationFrame(animate);
     };
-    
+
     animate();
-    
+
     return () => {
       window.removeEventListener("resize", resize);
       cancelAnimationFrame(animationFrameId);
     };
   }, []);
-  
+
   return (
     <canvas
       ref={canvasRef}
@@ -199,7 +199,7 @@ function Checkout() {
 
     setLoading(true);
 
-    const isUuid = (val) => 
+    const isUuid = (val) =>
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val);
 
     try {
@@ -417,24 +417,24 @@ function Checkout() {
       <div className="checkout-grid">
         {/* Left Column: Pickup & Payment options */}
         <div className="checkout-left-col">
-          
+
           {/* Pickup Options */}
           <section className="checkout-card-section">
             <h2 className="checkout-section-title">
               <span className="material-symbols-outlined checkout-section-title-icon">storefront</span>
               Pickup Options
             </h2>
-            
+
             <div className="pickup-options-grid">
-              
+
               {/* Counter A */}
-              <label 
+              <label
                 className={`selection-card ${pickupLocation === "counter_a" ? "selection-card-active" : ""}`}
               >
-                <input 
-                  type="radio" 
-                  name="pickup_location" 
-                  value="counter_a" 
+                <input
+                  type="radio"
+                  name="pickup_location"
+                  value="counter_a"
                   checked={pickupLocation === "counter_a"}
                   onChange={() => setPickupLocation("counter_a")}
                   className="sr-only"
@@ -453,13 +453,13 @@ function Checkout() {
               </label>
 
               {/* Counter B */}
-              <label 
+              <label
                 className={`selection-card ${pickupLocation === "counter_b" ? "selection-card-active" : ""}`}
               >
-                <input 
-                  type="radio" 
-                  name="pickup_location" 
-                  value="counter_b" 
+                <input
+                  type="radio"
+                  name="pickup_location"
+                  value="counter_b"
                   checked={pickupLocation === "counter_b"}
                   onChange={() => setPickupLocation("counter_b")}
                   className="sr-only"
@@ -486,17 +486,17 @@ function Checkout() {
               <span className="material-symbols-outlined checkout-section-title-icon">payments</span>
               Payment Methods
             </h2>
-            
+
             <div className="payment-methods-stack">
-              
+
               {/* University Wallet */}
-              <label 
+              <label
                 className={`payment-selection-card ${paymentMethod === "wallet" ? "payment-selection-card-active" : ""}`}
               >
-                <input 
-                  type="radio" 
-                  name="payment_method" 
-                  value="wallet" 
+                <input
+                  type="radio"
+                  name="payment_method"
+                  value="wallet"
                   checked={paymentMethod === "wallet"}
                   onChange={() => setPaymentMethod("wallet")}
                   className="sr-only"
@@ -508,7 +508,6 @@ function Checkout() {
                   <div className="payment-card-details">
                     <span className="payment-card-title">University Wallet</span>
                     <span className="payment-card-desc">Balance: KES {formatKES(walletBalance)}</span>
-                    <span className="promo-points-label">+5 Strat points</span>
                   </div>
                 </div>
                 <div className="radio-indicator">
@@ -517,13 +516,13 @@ function Checkout() {
               </label>
 
               {/* Mobile Money */}
-              <label 
+              <label
                 className={`payment-selection-card ${paymentMethod === "mobile" ? "payment-selection-card-active" : ""}`}
               >
-                <input 
-                  type="radio" 
-                  name="payment_method" 
-                  value="mobile" 
+                <input
+                  type="radio"
+                  name="payment_method"
+                  value="mobile"
                   checked={paymentMethod === "mobile"}
                   onChange={() => setPaymentMethod("mobile")}
                   className="sr-only"
@@ -595,15 +594,15 @@ function Checkout() {
               </div>
             </div>
 
-            <button 
-              className="place-order-btn cursor-pointer border-none" 
+            <button
+              className="place-order-btn cursor-pointer border-none"
               disabled={trayItems.length === 0 || loading}
               onClick={handlePlaceOrder}
             >
               <span className="material-symbols-outlined place-order-btn-icon" style={{ fontVariationSettings: "'FILL' 1" }}>check_circle</span>
               {loading ? "Processing..." : "Place Order"}
             </button>
-            
+
             <p className="agreement-disclaimer">
               By placing your order, you agree to our Terms of Service.
             </p>
@@ -614,10 +613,10 @@ function Checkout() {
 
       {/* Insufficient Balance Modal */}
       {showInsufficientBalanceModal && (
-        <div 
-          className="insufficient-modal-backdrop" 
-          role="dialog" 
-          aria-modal="true" 
+        <div
+          className="insufficient-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
           aria-labelledby="insufficient-modal-title"
           onClick={() => setShowInsufficientBalanceModal(false)}
         >
@@ -637,18 +636,18 @@ function Checkout() {
                 We're holding your order details so you can continue once your wallet is funded.
               </p>
             </div>
-            
+
             <div className="insufficient-modal-actions">
-              <button 
-                type="button" 
-                className="insufficient-btn-cancel cursor-pointer border-none" 
+              <button
+                type="button"
+                className="insufficient-btn-cancel cursor-pointer border-none"
                 onClick={() => setShowInsufficientBalanceModal(false)}
               >
                 Cancel
               </button>
-              <button 
-                type="button" 
-                className="insufficient-btn-confirm cursor-pointer border-none" 
+              <button
+                type="button"
+                className="insufficient-btn-confirm cursor-pointer border-none"
                 onClick={() => {
                   setShowInsufficientBalanceModal(false);
                   navigate("/wallet");
@@ -663,10 +662,10 @@ function Checkout() {
 
       {/* Active Order Limit Reached Modal */}
       {showActiveOrderErrorModal && (
-        <div 
-          className="insufficient-modal-backdrop" 
-          role="dialog" 
-          aria-modal="true" 
+        <div
+          className="insufficient-modal-backdrop"
+          role="dialog"
+          aria-modal="true"
           onClick={() => setShowActiveOrderErrorModal(false)}
         >
           <div className="insufficient-modal-content" onClick={(e) => e.stopPropagation()} style={{ maxWidth: "450px", textAlign: "center" }}>
@@ -685,11 +684,11 @@ function Checkout() {
                 Please wait until your current order is collected before placing a new one.
               </p>
             </div>
-            
+
             <div className="insufficient-modal-actions" style={{ flexDirection: "column", gap: "12px" }}>
-              <button 
-                type="button" 
-                className="insufficient-btn-confirm cursor-pointer border-none" 
+              <button
+                type="button"
+                className="insufficient-btn-confirm cursor-pointer border-none"
                 style={{ width: "100%", margin: 0 }}
                 onClick={() => {
                   setShowActiveOrderErrorModal(false);
@@ -698,9 +697,9 @@ function Checkout() {
               >
                 View Current Order
               </button>
-              <button 
-                type="button" 
-                className="insufficient-btn-cancel cursor-pointer border-none" 
+              <button
+                type="button"
+                className="insufficient-btn-cancel cursor-pointer border-none"
                 style={{ width: "100%", margin: 0, backgroundColor: "var(--color-surface-container-highest)" }}
                 onClick={() => setShowActiveOrderErrorModal(false)}
               >
@@ -731,8 +730,8 @@ function Checkout() {
                 You can track its progress from the Order Tracking page.
               </p>
             </div>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="success-overlay-cta cursor-pointer border-none"
               onClick={() => {
                 setShowSuccessOverlay(false);

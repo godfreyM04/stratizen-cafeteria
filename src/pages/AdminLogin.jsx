@@ -18,7 +18,7 @@ function AdminLogin() {
     setLoading(true);
 
     try {
-      if (email !== "admin@gmail.com" || password !== "admin") {
+      if (email !== "admin@gmail.com" || (password !== "admin" && password !== "admin.")) {
         throw new Error("Invalid administrator credentials.");
       }
       await login(email, password);

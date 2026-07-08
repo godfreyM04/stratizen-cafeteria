@@ -121,10 +121,10 @@ export const AuthProvider = ({ children }) => {
         console.log(`[Auth] Auth state change event received: ${event}`);
         if (!isMounted) return;
 
-        // Bypass onAuthStateChange for admin sessions so they are not cleared
+        // Bypass onAuthStateChange for mock admin sessions so they are not cleared
         const cachedProf = getCachedProfile();
-        if (cachedProf?.role === "admin") {
-          console.log("[Auth] Bypassing onAuthStateChange for Admin session");
+        if (cachedProf?.role === "admin" && cachedProf?.id === "admin-id-123456") {
+          console.log("[Auth] Bypassing onAuthStateChange for Mock Admin session");
           setLoading(false);
           return;
         }

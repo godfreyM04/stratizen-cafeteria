@@ -15,6 +15,49 @@ import ChefLogoutButton from "../components/ChefLogoutButton";
 import "../styles/MenuManager.css";
 import "../styles/UserManagement.css";
 
+const uploadImageToStorage = async (base64Data, filename) => {
+  // If it's already a URL (e.g. starts with http), return it unchanged
+  if (!base64Data || base64Data.startsWith("http")) {
+    return base64Data;
+  }
+
+  try {
+    const base64Parts = base64Data.split(",");
+    const mimeType = base64Parts[0].match(/:(.*?);/)[1];
+    const byteString = atob(base64Parts[1]);
+    const arrayBuffer = new ArrayBuffer(byteString.length);
+    const uint8Array = new Uint8Array(arrayBuffer);
+
+    for (let i = 0; i < byteString.length; i++) {
+      uint8Array[i] = byteString.charCodeAt(i);
+    }
+
+    const blob = new Blob([arrayBuffer], { type: mimeType });
+    const file = new File([blob], filename, { type: mimeType });
+
+    const path = `menu-${Date.now()}-${filename}`;
+    const { data, error } = await supabase.storage
+      .from("menu-images")
+      .upload(path, file, {
+        cacheControl: "3600",
+        upsert: true
+      });
+
+    if (error) {
+      throw new Error("Failed to upload image: " + error.message);
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from("menu-images")
+      .getPublicUrl(path);
+
+    return publicUrlData.publicUrl;
+  } catch (err) {
+    console.error("Storage upload failed, fallback to base64:", err.message);
+    return base64Data;
+  }
+};
+
 function MenuManager() {
   const { logout, profile } = useAuth();
   const navigate = useNavigate();
@@ -45,6 +88,10 @@ function MenuManager() {
   const [imagePreview, setImagePreview] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = useRef(null);
+
+  // Deletion Modal State
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [itemToDelete, setItemToDelete] = useState(null);
 
   // Categories aligned with Student Menu categories
   const categories = ["All", "Breakfast", "Lunch", "Dinner", "Sides", "Beverages"];
@@ -157,11 +204,24 @@ function MenuManager() {
 
     setIsSaving(true);
     try {
+      let finalImageUrl = formData.image_url;
+
+      // If the image is a new Base64 string, upload it to storage first
+      if (formData.image_url && formData.image_url.startsWith("data:image/")) {
+        const safeFilename = `${formData.name.toLowerCase().replace(/[^a-z0-9]/g, "-")}.jpg`;
+        finalImageUrl = await uploadImageToStorage(formData.image_url, safeFilename);
+      }
+
+      const itemPayload = {
+        ...formData,
+        image_url: finalImageUrl
+      };
+
       if (isEditing) {
-        await updateMenuItem(editingItemId, formData);
+        await updateMenuItem(editingItemId, itemPayload);
         addToast(`Successfully updated ${formData.name}`);
       } else {
-        await createMenuItem(formData);
+        await createMenuItem(itemPayload);
         addToast(`Successfully added ${formData.name}`);
       }
       closeModal();
@@ -195,30 +255,31 @@ function MenuManager() {
     }
   };
 
-  // Delete item with check for order references
-  const handleDeleteItem = async (item) => {
+  // Delete item - open confirmation modal
+  const handleDeleteItem = (item) => {
     if (!isAdmin) {
       addToast("Unauthorized action: Chefs cannot delete menu items.", "error");
       return;
     }
-    const hasRefs = await checkItemReferences(item.id);
-    const confirmMessage = hasRefs
-      ? `This item has been ordered in the past. Permanent deletion is not allowed. Would you like to Archive it (make it unavailable for future orders) instead?`
-      : `Are you sure you want to permanently delete "${item.name}"? This action cannot be undone.`;
+    setItemToDelete(item);
+    setIsDeleteModalOpen(true);
+  };
 
-    if (window.confirm(confirmMessage)) {
-      try {
-        const result = await deleteMenuItem(item.id);
-        if (result.type === "archive") {
-          addToast(`Archived "${item.name}" (set to unavailable)`);
-        } else {
-          addToast(`Deleted "${item.name}" permanently`);
-        }
-        loadMenu();
-      } catch (err) {
-        console.error("Failed to delete menu item:", err.message);
-        addToast("Failed to delete item.", "error");
-      }
+  // Confirm and execute delete from Supabase
+  const confirmDelete = async () => {
+    if (!itemToDelete) return;
+    setIsSaving(true);
+    try {
+      await deleteMenuItem(itemToDelete.id);
+      addToast(`Deleted "${itemToDelete.name}" permanently`);
+      setIsDeleteModalOpen(false);
+      setItemToDelete(null);
+      loadMenu();
+    } catch (err) {
+      console.error("Failed to delete menu item:", err.message);
+      addToast("Failed to delete item.", "error");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -733,6 +794,45 @@ function MenuManager() {
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Delete Confirmation Modal */}
+      {isDeleteModalOpen && itemToDelete && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-fadeIn"
+          style={{ transition: "all 0.2s ease-in-out" }}
+        >
+          <div className="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-xl w-full max-w-md overflow-hidden relative p-xl text-left">
+            <h3 className="text-headline-sm font-bold text-on-surface mb-md">Delete Menu Item</h3>
+            <p className="text-body-md text-on-surface-variant mb-xs">
+              Are you sure you want to permanently delete
+            </p>
+            <p className="text-body-md text-on-surface font-bold mb-md">
+              "{itemToDelete.name}"?
+            </p>
+            <p className="text-body-sm text-error font-medium mb-lg">
+              This action cannot be undone.
+            </p>
+            
+            <div className="flex items-center justify-end gap-md">
+              <button 
+                className="px-xl py-md text-label-lg text-primary border border-primary rounded-lg hover:bg-primary-container/10 transition-all active:scale-95 bg-transparent cursor-pointer"
+                type="button"
+                onClick={() => { setIsDeleteModalOpen(false); setItemToDelete(null); }}
+                disabled={isSaving}
+              >
+                Cancel
+              </button>
+              <button 
+                className="px-xl py-md text-label-lg text-white bg-error hover:bg-error/90 rounded-lg shadow-sm hover:shadow-md transition-all active:scale-95 border-none cursor-pointer"
+                type="button"
+                onClick={confirmDelete}
+                disabled={isSaving}
+              >
+                {isSaving ? "Deleting..." : "Delete"}
+              </button>
             </div>
           </div>
         </div>

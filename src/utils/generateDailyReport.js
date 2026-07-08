@@ -95,21 +95,55 @@ const getFormattedTime = () => {
 
 /* ── Data Fetcher ──────────────────────────────────────────── */
 
-async function fetchReportData() {
+async function fetchReportData(role) {
   const todayStart = new Date();
   todayStart.setHours(0, 0, 0, 0);
-  const todayStr = todayStart.toISOString();
+  const todayTime = todayStart.getTime();
 
-  const { data: ordersData, error } = await supabase
-    .from("orders")
-    .select("*, order_items(*, menu(*))")
-    .eq("status", "collected")
-    .gte("collected_at", todayStr)
-    .order("collected_at", { ascending: true });
+  let completedOrders = [];
+  if (role === "admin") {
+    const { data: ordersData, error: ordersError } = await supabase
+      .rpc("admin_get_all_orders");
+    if (ordersError) throw ordersError;
 
-  if (error) throw new Error("Failed to fetch orders: " + error.message);
+    const { data: itemsData, error: itemsError } = await supabase
+      .rpc("admin_get_all_order_items");
+    if (itemsError) throw itemsError;
 
-  const orders = ordersData || [];
+    const itemsMap = {};
+    (itemsData || []).forEach(item => {
+      if (!itemsMap[item.order_id]) {
+        itemsMap[item.order_id] = [];
+      }
+      itemsMap[item.order_id].push({
+        quantity: item.quantity,
+        menu: {
+          id: item.menu_item_id,
+          name: item.menu_name || "Meal"
+        }
+      });
+    });
+
+    completedOrders = (ordersData || [])
+      .filter(o => o.status === "collected" && new Date(o.collected_at || o.created_at).getTime() >= todayTime)
+      .map(o => ({
+        ...o,
+        order_items: itemsMap[o.id] || []
+      }));
+  } else {
+    const todayStr = todayStart.toISOString();
+    const { data: ordersData, error } = await supabase
+      .from("orders")
+      .select("*, order_items(*, menu(*))")
+      .eq("status", "collected")
+      .gte("collected_at", todayStr)
+      .order("collected_at", { ascending: true });
+
+    if (error) throw new Error("Failed to fetch orders: " + error.message);
+    completedOrders = ordersData || [];
+  }
+
+  const orders = completedOrders;
 
   /* Stats */
   const totalOrders = orders.length;
@@ -391,11 +425,11 @@ function drawFooter(doc, pageNum, totalPages) {
 
 /* ── Public Export Function ────────────────────────────────── */
 
-export async function generateDailyReport(onProgress) {
+export async function generateDailyReport(onProgress, role) {
   try {
     if (onProgress) onProgress("fetching");
 
-    const data = await fetchReportData();
+    const data = await fetchReportData(role);
 
     if (onProgress) onProgress("generating");
 
